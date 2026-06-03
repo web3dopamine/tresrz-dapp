@@ -1,0 +1,54 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+
+model User {
+  id        String   @id @default(cuid())
+  address   String   @unique            // checksummed wallet address
+  handle    String?  @unique
+  avatarSeed Int     @default(0)
+  bio       String?
+  createdAt DateTime @default(now())
+  tracks    Track[]  @relation("ArtistTracks")
+  likes     Like[]
+  sales     Sale[]   @relation("BuyerSales")
+}
+
+model Track {
+  id           String   @id @default(cuid())
+  chainTokenId Int?     @unique          // tokenId on TresrzMusic contract
+  title        String
+  genre        String
+  coverSeed    Int      @default(0)      // drives generative cover art
+  audioUrl     String?
+  priceWei     String   @default("0")    // primary price per edition (wei, string for bigint)
+  maxSupply    Int
+  minted       Int      @default(0)
+  txHash       String?
+  artist       User     @relation("ArtistTracks", fields: [artistId], references: [id])
+  artistId     String
+  hot          Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  likes        Like[]
+  sales        Sale[]
+}
+
+model Like {
+  id      String @id @default(cuid())
+  user    User   @relation(fields: [userId], references: [id])
+  userId  String
+  track   Track  @relation(fields: [trackId], references: [id])
+  trackId String
+  @@unique([userId, trackId])
+}
+
+model Sale {
+  id       String   @id @default(cuid())
+  track    Track    @relation(fields: [trackId], references: [id])
+  trackId  String
+  buyer    User     @relation("BuyerSales", fields: [buyerId], references: [id])
+  buyerId  String
+  qty      Int
+  priceWei String
+  txHash   String   @unique
+  createdAt DateTime @default(now())
+}
