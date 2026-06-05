@@ -1,8 +1,57 @@
+# ── Dependencies ─────────────────────────────────────────────
 node_modules/
+.pnp/
+.pnp.js
+.yarn/cache
+.yarn/unplugged
+
+# ── Environment / secrets ────────────────────────────────────
 .env
-.env.local
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ── Logs ─────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── Next.js (frontend) ───────────────────────────────────────
 .next/
+out/
+next-env.d.ts
+.vercel
+
+# ── Build output ─────────────────────────────────────────────
 dist/
+build/
+
+# ── Hardhat (contracts) ──────────────────────────────────────
 artifacts/
 cache/
-*.log
+typechain/
+typechain-types/
+coverage/
+coverage.json
+
+# ── Prisma (backend) ─────────────────────────────────────────
+# Generated client (uncomment if you don't commit it)
+# backend/src/generated/
+
+# ── Testing / coverage ───────────────────────────────────────
+.nyc_output/
+
+# ── OS files ─────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Editor / IDE ─────────────────────────────────────────────
+.idea/
+*.swp
+*.swo
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
