@@ -49,17 +49,27 @@ r.get("/:id", optionalAuth, async (req, res) => {
 r.post("/", requireAuth, async (req, res) => {
   const { title, genre, maxSupply, priceWei, coverSeed, audioUrl, chainTokenId, txHash } = req.body;
   if (!title || !genre || !maxSupply) return res.status(400).json({ error: "missing fields" });
-  const track = await prisma.track.create({
-    data: {
-      title, genre: String(genre).toUpperCase(),
-      maxSupply: Number(maxSupply), priceWei: String(priceWei || "0"),
-      coverSeed: Number(coverSeed) || Math.floor(Math.random() * 9999),
-      audioUrl: audioUrl || null, chainTokenId: chainTokenId ?? null, txHash: txHash || null,
-      artistId: req.user.id,
-    },
-    include: { artist: true, _count: { select: { likes: true } } },
-  });
-  res.status(201).json(shape(track, req.user.id));
+  const supply = Number(maxSupply);
+  if (!Number.isInteger(supply) || supply < 1) return res.status(400).json({ error: "maxSupply must be a positive integer" });
+  try {
+    const track = await prisma.track.create({
+      data: {
+        title: String(title).slice(0, 120), genre: String(genre).toUpperCase().slice(0, 40),
+        maxSupply: supply, priceWei: String(priceWei || "0"),
+        coverSeed: Number(coverSeed) || Math.floor(Math.random() * 9999),
+        audioUrl: audioUrl || null,
+        chainTokenId: chainTokenId === null || chainTokenId === undefined ? null : Number(chainTokenId),
+        txHash: txHash || null,
+        artistId: req.user.id,
+      },
+      include: { artist: true, _count: { select: { likes: true } } },
+    });
+    res.status(201).json(shape(track, req.user.id));
+  } catch (e) {
+    // P2002 = unique constraint (e.g. chainTokenId already persisted)
+    if (e?.code === "P2002") return res.status(409).json({ error: "track already exists for this chainTokenId" });
+    res.status(500).json({ error: "could not create track", detail: String(e.message || e) });
+  }
 });
 
 export default r;

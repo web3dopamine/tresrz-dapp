@@ -1,5 +1,11 @@
-generator client { provider = "prisma-client-js" }
-datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
 
 model User {
   id        String   @id @default(cuid())
@@ -30,6 +36,14 @@ model Track {
   createdAt    DateTime @default(now())
   likes        Like[]
   sales        Sale[]
+}
+
+// SIWE login nonces. DB-backed so issued nonces survive an API restart (the old
+// in-memory Map dropped every pending login whenever the process bounced).
+model SiweNonce {
+  address   String   @id          // lower-cased wallet address
+  nonce     String
+  createdAt DateTime @default(now())
 }
 
 model Like {

@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Header from "@/components/Header";
 import TrackCard from "@/components/TrackCard";
@@ -73,7 +74,7 @@ export default function Home() {
       <section className="block" id="latest">
         <div className="sec-title">LATEST DROPS</div>
         <div className="sec-bar" />
-        <div className="latest-grid">{fLatest.map((t) => <DropCard key={t.id} t={t} onClick={() => toast(`Opening ${t.title}`)} />)}</div>
+        <div className="latest-grid">{fLatest.map((t) => <DropCard key={t.id} t={t} />)}</div>
       </section>
 
       <footer>
@@ -82,8 +83,8 @@ export default function Home() {
             <div className="logo"><div className="bars"><span /><span /><span /><span /></div><b>TRES<span>RZ</span></b></div>
             <p>The marketplace where music becomes property. Mint your masters, sell limited editions, and let fans truly own the sound.</p>
           </div>
-          <div className="foot-col"><h5>MARKET</h5><a href="#hot">Explore</a><a href="#latest">Latest drops</a><a href="#popular">Top artists</a><a href="#">Genres</a></div>
-          <div className="foot-col"><h5>CREATE</h5><a href="#">Mint a track</a><a href="#">Royalties</a><a href="#">Certifications</a><a href="#">Docs</a></div>
+          <div className="foot-col"><h5>MARKET</h5><a href="#hot">Explore</a><a href="#latest">Latest drops</a><a href="#popular">Top artists</a><a href="#hot">Genres</a></div>
+          <div className="foot-col"><h5>CREATE</h5><Link href="/mint">Mint a track</Link><a href="#popular">Royalties</a><a href="#popular">Certifications</a><a href="#hot">Docs</a></div>
           <div className="foot-col"><h5>COMPANY</h5><a href="#">About</a><a href="#">Blog</a><a href="#">Careers</a><a href="#">Contact</a></div>
         </div>
         <div className="foot-bottom"><span>© 2026 TRESRZ — All rights reserved</span><span>TERMS · PRIVACY · COOKIES</span></div>

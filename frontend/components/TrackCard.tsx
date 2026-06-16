@@ -1,53 +1,85 @@
 "use client";
-import { useState } from "react";
-import { formatEther, parseEther } from "viem";
-import { useAccount, useWriteContract, usePublicClient } from "wagmi";
+import { useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CoverArt, avatarUrl } from "@/lib/art";
-import { musicAbi, MUSIC_CONTRACT } from "@/lib/abi";
 import { api, type Track } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useBuyTrack } from "@/lib/useBuyTrack";
 
 export default function TrackCard({ t, toast }: { t: Track; toast: (m: string) => void }) {
-  const [playing, setPlaying] = useState(false);
-  const [left, setLeft] = useState(t.left);
-  const [busy, setBusy] = useState(false);
-  const { isConnected } = useAccount();
+  const router = useRouter();
   const { token } = useAuth();
-  const { writeContractAsync } = useWriteContract();
-  const publicClient = usePublicClient();
+  const { buy, busy } = useBuyTrack();
 
-  const priceEth = (() => { try { return formatEther(BigInt(t.priceWei)); } catch { return "0"; } })();
+  const [left, setLeft] = useState(t.left);
+  const [liked, setLiked] = useState(t.liked);
+  const [likes, setLikes] = useState(t.likes);
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  async function buy() {
-    if (!isConnected || !token) return toast("Connect your wallet first");
-    if (t.chainTokenId == null) return toast("Track not yet on-chain");
-    setBusy(true);
+  const priceEth = (() => { try { return Number(BigInt(t.priceWei)) / 1e18; } catch { return 0; } })();
+
+  function togglePlay(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!t.audioUrl) return toast("No audio for this track");
+    const el = audioRef.current;
+    if (!el) return;
+    if (el.paused) { el.play().then(() => setPlaying(true)).catch(() => toast("Could not play audio")); }
+    else { el.pause(); setPlaying(false); }
+  }
+
+  async function onBuy() {
+    const res = await buy(t);
+    if (!res.ok) return toast(res.error);
+    toast(`Bought ${t.title} ✓`);
+    setLeft((l) => Math.max(0, l - 1)); // optimistic
+    api.track(t.id).then((fresh) => setLeft(fresh.left)).catch(() => {}); // reconcile
+  }
+
+  async function onLike(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!token) return toast("Sign in to like");
+    const prev = { liked, likes };
+    setLiked(!liked); setLikes((v) => v + (liked ? -1 : 1)); // optimistic
     try {
-      const hash = await writeContractAsync({
-        abi: musicAbi, address: MUSIC_CONTRACT, functionName: "buy",
-        args: [BigInt(t.chainTokenId), 1n], value: parseEther(priceEth),
-      });
-      await publicClient?.waitForTransactionReceipt({ hash });
-      await api.recordSale({ trackId: t.id, qty: 1, priceWei: t.priceWei, txHash: hash });
-      setLeft((l) => Math.max(0, l - 1));
-      toast(`Bought ${t.title} ✓`);
-    } catch (e: any) {
-      toast(e?.shortMessage || "Purchase cancelled");
-    } finally { setBusy(false); }
+      const res = await api.toggleLike(t.id); // { liked, count } from server
+      setLiked(res.liked); setLikes(res.count); // reconcile
+    } catch {
+      setLiked(prev.liked); setLikes(prev.likes); // revert
+      toast("Could not update like");
+    }
   }
 
   return (
     <div className="card">
-      <div className={`art${playing ? " playing" : ""}`} onClick={() => setPlaying((p) => !p)}>
+      <div className={`art${playing ? " playing" : ""}`} onClick={() => router.push(`/track/${t.id}`)} style={{ cursor: "pointer" }}>
         <CoverArt seed={t.coverSeed} />
         <div className="genre">{t.genre}</div>
-        <div className="play"><div className="pbtn"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg></div></div>
+        <div className="play" onClick={togglePlay}>
+          <div className="pbtn">
+            {playing
+              ? <svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z" /></svg>
+              : <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>}
+          </div>
+        </div>
         <div className="wave">{Array.from({ length: 22 }).map((_, i) => <i key={i} style={{ animationDelay: `${i * 0.06}s` }} />)}</div>
+        {t.audioUrl && <audio ref={audioRef} src={t.audioUrl} preload="none" onEnded={() => setPlaying(false)} onPause={() => setPlaying(false)} onPlay={() => setPlaying(true)} />}
       </div>
-      <h3>{t.title}</h3>
-      <div className="by"><img src={avatarUrl(t.artist.avatarSeed)} alt="" /><span>by <b>{t.artist.handle}</b></span></div>
-      <div className="price">{Number(priceEth).toFixed(2)} ETH <em>{left} left</em></div>
-      <button className="buy" disabled={busy || left === 0} onClick={buy}>{left === 0 ? "SOLD OUT" : busy ? "CONFIRMING…" : "BUY NOW"}</button>
+      <h3><Link href={`/track/${t.id}`} style={{ color: "inherit", textDecoration: "none" }}>{t.title}</Link></h3>
+      <Link href={`/artist/${t.artist.address}`} className="by" style={{ textDecoration: "none" }}>
+        <img src={avatarUrl(t.artist.avatarSeed)} alt="" /><span>by <b>{t.artist.handle}</b></span>
+      </Link>
+      <div className="price">
+        {priceEth.toFixed(2)} ETH <em>{left} left</em>
+        <button className={`heart card-heart${liked ? " liked" : ""}`} onClick={onLike} aria-label="like">
+          <svg viewBox="0 0 24 24"><path d="M12 21s-7-4.5-9.5-8.5C1 9 3 5.5 6.5 5.5c2 0 3.5 1.3 5.5 3 2-1.7 3.5-3 5.5-3C21 5.5 23 9 21.5 12.5 19 16.5 12 21 12 21z" /></svg>
+          <small>{likes}</small>
+        </button>
+      </div>
+      <button className="buy" disabled={busy || left === 0} onClick={onBuy}>{left === 0 ? "SOLD OUT" : busy ? "CONFIRMING…" : "BUY NOW"}</button>
     </div>
   );
 }
