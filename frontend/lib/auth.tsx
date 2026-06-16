@@ -25,7 +25,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const msg = new SiweMessage({
         domain: window.location.host,
         address,
-        statement: "Sign in to TRESRZ — own the sound.",
+        statement: "Sign in to TRESRZ - own the sound.",
         uri: window.location.origin,
         version: "1",
         chainId: chainId ?? 13370,

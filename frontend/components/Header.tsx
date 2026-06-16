@@ -1,10 +1,11 @@
 "use client";
+import Link from "next/link";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount } from "wagmi";
 import { useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 
-export default function Header({ search, setSearch }: { search: string; setSearch: (s: string) => void }) {
+export default function Header({ search, setSearch }: { search?: string; setSearch?: (s: string) => void }) {
   const { isConnected } = useAccount();
   const { token, signIn, signOut, loading } = useAuth();
 
@@ -13,14 +14,20 @@ export default function Header({ search, setSearch }: { search: string; setSearc
 
   return (
     <header>
-      <div className="logo" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
+      <Link href="/" className="logo" style={{ textDecoration: "none" }}>
         <div className="bars"><span /><span /><span /><span /></div>
         <b>TRES<span>RZ</span></b>
-      </div>
-      <div className="search"><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search artist or track" /></div>
+      </Link>
+      {setSearch && (
+        <div className="search"><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search artist or track" /></div>
+      )}
       <div className="lang"><button className="on">EN</button><i>/</i><button>IT</button></div>
       <nav>
-        <a href="#hot">MARKETPLACE</a><a href="#popular">DROPS</a><a href="#latest">STREAMING</a><a href="#popular">CERTIFICATIONS</a>
+        <Link href="/#hot">MARKETPLACE</Link>
+        <Link href="/#popular">DROPS</Link>
+        <Link href="/#latest">STREAMING</Link>
+        <Link href="/mint">MINT</Link>
+        <Link href="/collection">COLLECTION</Link>
       </nav>
       <div className="auth-area">
         {token && <button className="heart" style={{ color: "var(--muted)", fontSize: 11 }} onClick={signOut}>SIGN OUT</button>}

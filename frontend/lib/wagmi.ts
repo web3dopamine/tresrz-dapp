@@ -11,9 +11,28 @@ export const libertyChain = defineChain({
   blockExplorers: { default: { name: "Blockscout", url: "https://explorer.libertychain.org" } },
 });
 
+// Local hardhat node (chainId 31337). Used when deploying/developing against
+// `npx hardhat node`. The contract in NEXT_PUBLIC_MUSIC_CONTRACT is deployed here.
+export const hardhatLocal = defineChain({
+  id: 31337,
+  name: "Hardhat Local",
+  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+  rpcUrls: { default: { http: ["http://127.0.0.1:8545"] } },
+});
+
+// All chains the wallet may use. The one matching NEXT_PUBLIC_DEFAULT_CHAIN is put
+// first so RainbowKit/wagmi selects it by default.
+const allChains = [hardhatLocal, libertyChain, sepolia, mainnet] as const;
+const defaultChainId = Number(process.env.NEXT_PUBLIC_DEFAULT_CHAIN || hardhatLocal.id);
+
+const ordered = [
+  ...allChains.filter((c) => c.id === defaultChainId),
+  ...allChains.filter((c) => c.id !== defaultChainId),
+] as unknown as typeof allChains;
+
 export const config = getDefaultConfig({
   appName: "TRESRZ",
   projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID || "demo",
-  chains: [libertyChain, sepolia, mainnet],
+  chains: ordered,
   ssr: true,
 });
