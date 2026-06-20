@@ -10,12 +10,17 @@ const shape = (t, userId) => ({
   title: t.title,
   genre: t.genre,
   coverSeed: t.coverSeed,
-  audioUrl: t.audioUrl,
+  audioUrl: t.audioUrl,        // public preview source
+  coverUrl: t.coverUrl,
+  metadataUri: t.metadataUri,
+  mime: t.mime,
+  hasFullAudio: !!(t.audioCid || t.audioUrl), // full track exists (gated via /api/stream)
   priceWei: t.priceWei,
   maxSupply: t.maxSupply,
   minted: t.minted,
   left: t.maxSupply - t.minted,
   hot: t.hot,
+  flagged: t.flagged,
   artist: { id: t.artist.id, handle: t.artist.handle || t.artist.address.slice(0, 6) + "…", address: t.artist.address, avatarSeed: t.artist.avatarSeed },
   likes: t._count?.likes ?? 0,
   liked: userId ? t.likes?.some((l) => l.userId === userId) : false,
@@ -23,10 +28,18 @@ const shape = (t, userId) => ({
 
 // GET /api/tracks?hot=true&genre=HOUSE&limit=10
 r.get("/", optionalAuth, async (req, res) => {
-  const { hot, genre, limit } = req.query;
-  const where = {};
+  const { hot, genre, limit, q } = req.query;
+  const where = { flagged: false }; // hide moderated tracks from public listings
   if (hot === "true") where.hot = true;
   if (genre) where.genre = String(genre).toUpperCase();
+  if (q) {
+    // server-side search across title + artist handle/address
+    where.OR = [
+      { title: { contains: String(q), mode: "insensitive" } },
+      { artist: { handle: { contains: String(q), mode: "insensitive" } } },
+      { artist: { address: { contains: String(q), mode: "insensitive" } } },
+    ];
+  }
   const tracks = await prisma.track.findMany({
     where,
     take: limit ? Number(limit) : 50,
@@ -47,7 +60,7 @@ r.get("/:id", optionalAuth, async (req, res) => {
 
 // POST /api/tracks  (after on-chain mint, persist metadata)
 r.post("/", requireAuth, async (req, res) => {
-  const { title, genre, maxSupply, priceWei, coverSeed, audioUrl, chainTokenId, txHash } = req.body;
+  const { title, genre, maxSupply, priceWei, coverSeed, audioUrl, audioCid, coverUrl, metadataUri, mime, chainTokenId, txHash } = req.body;
   if (!title || !genre || !maxSupply) return res.status(400).json({ error: "missing fields" });
   const supply = Number(maxSupply);
   if (!Number.isInteger(supply) || supply < 1) return res.status(400).json({ error: "maxSupply must be a positive integer" });
@@ -58,6 +71,10 @@ r.post("/", requireAuth, async (req, res) => {
         maxSupply: supply, priceWei: String(priceWei || "0"),
         coverSeed: Number(coverSeed) || Math.floor(Math.random() * 9999),
         audioUrl: audioUrl || null,
+        audioCid: audioCid || null,
+        coverUrl: coverUrl || null,
+        metadataUri: metadataUri || null,
+        mime: mime || null,
         chainTokenId: chainTokenId === null || chainTokenId === undefined ? null : Number(chainTokenId),
         txHash: txHash || null,
         artistId: req.user.id,

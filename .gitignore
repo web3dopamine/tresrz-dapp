@@ -58,3 +58,7 @@ Thumbs.db
 
 # TS build info
 *.tsbuildinfo
+
+# M3 IPFS local-fallback storage (runtime artifacts)
+backend/uploads/
+uploads/

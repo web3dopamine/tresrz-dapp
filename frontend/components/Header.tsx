@@ -2,15 +2,23 @@
 import Link from "next/link";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount } from "wagmi";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { api } from "@/lib/api";
 
 export default function Header({ search, setSearch }: { search?: string; setSearch?: (s: string) => void }) {
-  const { isConnected } = useAccount();
+  const { address, isConnected } = useAccount();
   const { token, signIn, signOut, loading } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // prompt SIWE once wallet connects but not yet authenticated
-  useEffect(() => { if (isConnected && !token && !loading) signIn().catch(() => {}); }, [isConnected, token]);
+  useEffect(() => { if (isConnected && !token && !loading) void signIn(); }, [isConnected, token]);
+
+  // check admin access once authenticated (SSR-safe: runs in effect)
+  useEffect(() => {
+    if (!token) { setIsAdmin(false); return; }
+    api.me().then((d) => setIsAdmin(!!d.isAdmin)).catch(() => setIsAdmin(false));
+  }, [token]);
 
   return (
     <header>
@@ -28,6 +36,8 @@ export default function Header({ search, setSearch }: { search?: string; setSear
         <Link href="/#latest">STREAMING</Link>
         <Link href="/mint">MINT</Link>
         <Link href="/collection">COLLECTION</Link>
+        {isConnected && address && <Link href={`/profile/${address}`}>PROFILE</Link>}
+        {isAdmin && <Link href="/admin">ADMIN</Link>}
       </nav>
       <div className="auth-area">
         {token && <button className="heart" style={{ color: "var(--muted)", fontSize: 11 }} onClick={signOut}>SIGN OUT</button>}

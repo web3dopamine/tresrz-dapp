@@ -13,10 +13,12 @@ model User {
   handle    String?  @unique
   avatarSeed Int     @default(0)
   bio       String?
+  flagged   Boolean  @default(false)    // admin moderation flag
   createdAt DateTime @default(now())
   tracks    Track[]  @relation("ArtistTracks")
   likes     Like[]
   sales     Sale[]   @relation("BuyerSales")
+  soldSales Sale[]   @relation("SellerSales")
 }
 
 model Track {
@@ -25,14 +27,19 @@ model Track {
   title        String
   genre        String
   coverSeed    Int      @default(0)      // drives generative cover art
-  audioUrl     String?
+  audioUrl     String?                   // public preview URL (gateway/local)
+  audioCid     String?                   // full-track IPFS CID (gated to holders)
+  coverUrl     String?                   // cover image URL (IPFS/local), optional
+  metadataUri  String?                   // ipfs:// or URL of ERC-721 metadata JSON
+  mime         String?                   // audio mime type (e.g. audio/mpeg)
   priceWei     String   @default("0")    // primary price per edition (wei, string for bigint)
   maxSupply    Int
   minted       Int      @default(0)
   txHash       String?
   artist       User     @relation("ArtistTracks", fields: [artistId], references: [id])
   artistId     String
-  hot          Boolean  @default(false)
+  hot          Boolean  @default(false)  // "featured" flag (admin-controlled)
+  flagged      Boolean  @default(false)  // admin moderation flag (hidden from listings)
   createdAt    DateTime @default(now())
   likes        Like[]
   sales        Sale[]
@@ -61,8 +68,11 @@ model Sale {
   trackId  String
   buyer    User     @relation("BuyerSales", fields: [buyerId], references: [id])
   buyerId  String
+  seller   User?    @relation("SellerSales", fields: [sellerId], references: [id])
+  sellerId String?                                  // null for primary sales
+  kind     String   @default("primary")             // primary | secondary_listing | secondary_offer
   qty      Int
-  priceWei String
+  priceWei String                                    // total paid (wei)
   txHash   String   @unique
   createdAt DateTime @default(now())
 }

@@ -7,6 +7,10 @@ import trackRoutes from "./routes/tracks.js";
 import artistRoutes from "./routes/artists.js";
 import likeRoutes from "./routes/likes.js";
 import saleRoutes from "./routes/sales.js";
+import uploadRoutes from "./routes/upload.js";
+import streamRoutes from "./routes/stream.js";
+import adminRoutes from "./routes/admin.js";
+import { UPLOAD_DIR } from "./ipfs.js";
 
 // Fail fast: a missing/placeholder JWT_SECRET means every token is forgeable.
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -16,6 +20,10 @@ if (!JWT_SECRET || JWT_SECRET === "change_me_to_a_long_random_string" || JWT_SEC
 }
 
 const app = express();
+// Requests arrive via a proxy: the Next.js /api rewrite (and Cloudflare in front of it)
+// set X-Forwarded-For. Trust one proxy hop so req.ip is the real client and
+// express-rate-limit accepts the forwarded header instead of crashing.
+app.set("trust proxy", 1);
 app.use(express.json({ limit: "256kb" }));
 
 // --- rate limiting ---
@@ -46,12 +54,19 @@ app.use(
 );
 
 app.get("/health", (_req, res) => res.json({ ok: true, service: "tresrz-api" }));
+
+// Serve locally-stored uploads (IPFS fallback when PINATA_JWT is unset).
+app.use("/uploads", express.static(UPLOAD_DIR));
+
 app.use("/api", apiLimiter);
 app.use("/api/auth", strictLimiter, authRoutes);
 app.use("/api/tracks", trackRoutes);
 app.use("/api/artists", artistRoutes);
 app.use("/api/likes", likeRoutes);
 app.use("/api/sales", strictLimiter, saleRoutes);
+app.use("/api/upload", strictLimiter, uploadRoutes);
+app.use("/api/stream", streamRoutes);
+app.use("/api/admin", adminRoutes);
 
 // 404 + central error handler so a thrown/rejected handler returns JSON, never crashes.
 app.use((_req, res) => res.status(404).json({ error: "not found" }));

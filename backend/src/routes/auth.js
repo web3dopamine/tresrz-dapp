@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { generateNonce, SiweMessage } from "siwe";
 import { prisma } from "../db.js";
-import { signToken, requireAuth } from "../middleware/auth.js";
+import { signToken, requireAuth, isAdminAddress } from "../middleware/auth.js";
 
 const r = Router();
 const NONCE_TTL_MS = 10 * 60 * 1000; // a login nonce is valid for 10 minutes
@@ -80,7 +80,7 @@ r.post("/verify", async (req, res) => {
 // 3) Who am I
 r.get("/me", requireAuth, async (req, res) => {
   const user = await prisma.user.findUnique({ where: { id: req.user.id } });
-  res.json({ user });
+  res.json({ user, isAdmin: isAdminAddress(req.user.address) });
 });
 
 export default r;

@@ -38,7 +38,7 @@ export default function ArtistPage() {
                   <span><b>{artist.nftCount}</b> tracks</span>
                   <span><b>{artist.totalLikes}</b> total likes</span>
                 </div>
-                {artist.bio && <p className="artist-bio">{artist.bio}</p>}
+                <p className="artist-bio">{artist.bio || `${artist.handle} is an independent artist minting limited-edition music on TRESRZ.`}</p>
               </div>
             </div>
 

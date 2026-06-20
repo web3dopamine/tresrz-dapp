@@ -16,21 +16,40 @@ const ARTIST_KEYS = [
   "0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba",
 ];
 const HANDLES = ["BLOCKJ4NE", "Charlie", "The_Account", "TwoSpiral", "GordieDean", "Adeline_Yeo"];
+// Artist profiles (shown on /artist/[address]) — matched to the genres each one mints.
+const BIOS = [
+  "Synthwave architect and jazz dropout from the neon side of the grid. BLOCKJ4NE builds widescreen analog dreams — chrome arpeggios one night, smoke-filled piano rooms the next.",
+  "House selector with a trap heart. Charlie chases the 3am warehouse feeling and bottles it — rolling basslines, hands-in-the-air drops, and grit when you least expect it.",
+  "Ambient cartographer turned phonk experimentalist. The_Account maps the quiet between beats, then floods it with distortion. Music for empty highways and full minds.",
+  "Techno purist and drill agitator. TwoSpiral works in loops that tighten until they snap — hypnotic, mechanical, and built for rooms with no windows.",
+  "Dub craftsman. One track, one edition, no compromises. GordieDean carves heavyweight low-end and cavernous echo — sound-system music for the blockchain age.",
+  "Lo-fi composer and late-night romantic. Adeline_Yeo presses warmth into tape hiss — dusty keys, soft drums, and the kind of melody you hum without noticing.",
+];
 
-// Public sample audio so the in-app player actually plays something.
-const SAMPLE_AUDIO = Array.from({ length: 10 }, (_, i) => `https://www.soundhelix.com/examples/mp3/SoundHelix-Song-${i + 1}.mp3`);
-
+// Real, genre-matched audio for every track — Creative-Commons / royalty-free pieces
+// hosted on archive.org (verified hotlinkable: HTTP 200 audio/mpeg from any origin, no
+// Referer restriction). Each track gets its own fitting track; none are left empty.
 const tracks = [
-  { title: "NEON PULSE", genre: "SYNTHWAVE", price: 0.47, max: 14, hot: true, royaltyPct: 5 },
-  { title: "Remore", genre: "HOUSE", price: 1.97, max: 1, hot: true, royaltyPct: 7 },
-  { title: "AWAKENING", genre: "AMBIENT", price: 3.8, max: 33, hot: true, royaltyPct: 4 },
-  { title: "Two Spirals", genre: "TECHNO", price: 0.85, max: 5, hot: true, royaltyPct: 6 },
-  { title: "Dub Skull", genre: "DUB", price: 9.39, max: 1, hot: true, royaltyPct: 10 },
-  { title: "After Hours", genre: "LO-FI", price: 0.3, max: 20, royaltyPct: 3 },
-  { title: "Polychrome", genre: "JAZZ", price: 0.55, max: 8, royaltyPct: 5 },
-  { title: "Latin Tech", genre: "TRAP", price: 1.1, max: 12, royaltyPct: 5 },
-  { title: "Static Bloom", genre: "PHONK", price: 0.72, max: 6, royaltyPct: 5 },
-  { title: "Midnight Run", genre: "DRILL", price: 1.45, max: 9, royaltyPct: 5 },
+  { title: "NEON PULSE", genre: "SYNTHWAVE", price: 0.47, max: 14, hot: true, royaltyPct: 5,
+    audio: "https://archive.org/download/retro-promenade_202011/Retro%20Promenade/%5BRP-TS001%5D%20Time%20Slap%20Podcast%20Trailers%20-%20Season%201%20%282014%29/01.%20001%20The%20Chrome%20Warrior%20Vendetta.mp3" },
+  { title: "Remore", genre: "HOUSE", price: 1.97, max: 1, hot: true, royaltyPct: 7,
+    audio: "https://archive.org/download/rest037-kay_grove_-_samba_440-night_walk/rest037-01-kay_grove_-_samba440_vbr.mp3" },
+  { title: "AWAKENING", genre: "AMBIENT", price: 3.8, max: 33, hot: true, royaltyPct: 4,
+    audio: "https://archive.org/download/pcr089EmilDavydov-Sketches/pcr089_01_emil_davydov_sketch_no1.mp3" },
+  { title: "Two Spirals", genre: "TECHNO", price: 0.85, max: 5, hot: true, royaltyPct: 6,
+    audio: "https://archive.org/download/dig017_tromenia_ep/dig017_01_blurix_-_tromenia.mp3" },
+  { title: "Dub Skull", genre: "DUB", price: 9.39, max: 1, hot: true, royaltyPct: 10,
+    audio: "https://archive.org/download/DWK031/Aydio_-_02_-_Deltitnu.mp3" },
+  { title: "After Hours", genre: "LO-FI", price: 0.3, max: 20, royaltyPct: 3,
+    audio: "https://archive.org/download/DWK044/Lo-Fi_Scientists_-_01_-_Jazz_Baby_vbr.mp3" },
+  { title: "Polychrome", genre: "JAZZ", price: 0.55, max: 8, royaltyPct: 5,
+    audio: "https://archive.org/download/ca200_cjazz/101_Strings_Of_Consciousness__Asphodel.mp3" },
+  { title: "Latin Tech", genre: "TRAP", price: 1.1, max: 12, royaltyPct: 5,
+    audio: "https://archive.org/download/ariesbeatschilltrap/Aries_Beats_-_Chill_Trap.mp3" },
+  { title: "Static Bloom", genre: "PHONK", price: 0.72, max: 6, royaltyPct: 5,
+    audio: "https://archive.org/download/flames-by-shadxwfxre/FLAMES%20BY%20SHADXWFXRE.mp3" },
+  { title: "Midnight Run", genre: "DRILL", price: 1.45, max: 9, royaltyPct: 5,
+    audio: "https://archive.org/download/free-for-profit-central-cee-x-uk-drill-type-beat-tension/%28FREE%20FOR%20PROFIT%29%20UK%20Drill%20Type%20Beat%20SECRETS%20%20NY%20Drill%20Type%20Beat%20%20Free%20Drill%20instrumental%202023.mp3" },
 ];
 
 const MINT_ABI = [
@@ -76,7 +95,7 @@ async function main() {
   const userIds = [];
   for (let i = 0; i < HANDLES.length; i++) {
     const u = await prisma.user.create({
-      data: { address: accounts[i].address, handle: HANDLES[i], avatarSeed: i * 137 + 7 },
+      data: { address: accounts[i].address, handle: HANDLES[i], avatarSeed: i * 137 + 7, bio: BIOS[i] },
     });
     userIds.push(u.id);
   }
@@ -84,7 +103,7 @@ async function main() {
   for (let i = 0; i < tracks.length; i++) {
     const t = tracks[i];
     t.coverSeed = i * 53 + 11;
-    t.audioUrl = SAMPLE_AUDIO[i % SAMPLE_AUDIO.length];
+    t.audioUrl = t.audio;
     const artistIdx = i % HANDLES.length;
     let chainTokenId = null, txHash = null;
     if (onChain) {
