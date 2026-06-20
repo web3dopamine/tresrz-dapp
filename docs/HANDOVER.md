@@ -120,12 +120,43 @@ real IPFS.
 
 ---
 
+## 4b. Sepolia staging (live)
+
+Deployed and verified on Sepolia (chainId 11155111) on 2026-06-20:
+
+| Contract | Address |
+|---|---|
+| `TresrzMusic` | `0x1E109bcA6c2088abCE2D604483137949f8B4BBFA` |
+| `TresrzMarketplace` | `0x2F8b555352618E8c04A740C5002489AD05F48FD1` |
+
+Deployer/treasury: `0xe5EC7c3E4F2fFd95dC62b97465c932a457AB539F` (burner — testnet ETH
+only). RPC: Alchemy Sepolia (in `contracts/.env`, gitignored).
+
+Verified end-to-end with `backend/scripts/market-e2e-sepolia.mjs` (a testnet-scaled
+mirror of `market-e2e.mjs`: mint → primary buy → list → secondary buy → offer →
+accept, with a freshly-generated funded buyer and a sweep-back). On-chain splits
+confirmed correct: 5% royalty + 2.5% platform fee on the secondary sale. Run:
+```bash
+RPC_URL=<sepolia-rpc> MUSIC_CONTRACT=0x1E10..BBFA MARKET_CONTRACT=0x2F8b..8FD1 \
+  DEPLOYER_PK=0x<funded-key> CHAIN_ID=11155111 \
+  node backend/scripts/market-e2e-sepolia.mjs
+```
+
+> The live dev stack (`:31337`/`:31338`) is NOT yet repointed to Sepolia — it still
+> targets the local chain. To make Sepolia the running staging env, set the two
+> contract addresses + Sepolia RPC + `CHAIN_ID=11155111` in `backend/.env` and the
+> `NEXT_PUBLIC_*` equivalents (incl. `NEXT_PUBLIC_DEFAULT_CHAIN=11155111`) in
+> `frontend/.env.local`, then restart both.
+
+---
+
 ## 5. Testing
 
 | Suite | Command | Covers |
 |---|---|---|
 | Contract units | `cd contracts && npm test` | mint/royalty bounds, primary fee split, refund, reentrancy, **secondary listings + offers, royalty+fee distribution, admin bounds** (35 tests) |
-| Marketplace E2E | `node backend/scripts/market-e2e.mjs` | list→buy + offer→accept against a live chain |
+| Marketplace E2E | `node backend/scripts/market-e2e.mjs` | mint→primary-buy→list→secondary-buy + offer→accept against a local chain |
+| Marketplace E2E (Sepolia) | `… node backend/scripts/market-e2e-sepolia.mjs` | same flow, testnet-scaled, funded buyer + sweep-back (see §4b) |
 | Primary E2E | `node backend/scripts/{mint,buy,sales-verify}-e2e.mjs` | mint/buy/sale-reconciliation |
 | Load / perf | `CONNS=50 DURATION=10 node backend/scripts/loadtest.mjs` | API throughput + p50/p95/p99 latency; distinguishes 429 rate-limit from real errors |
 
