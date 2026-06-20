@@ -96,11 +96,13 @@ real IPFS.
    `TresrzMarketplace.sol`. Do not deploy to mainnet before sign-off. (See §6.)
 2. **Stage on a testnet first.** Deploy to Sepolia, run `scripts/market-e2e.mjs`
    and the full app flow against it.
-3. **Configure** `contracts/.env` with the mainnet `PRIVATE_KEY` and `FEE_RECIPIENT`.
+3. **Configure** `contracts/.env` with `MAINNET_RPC`, the mainnet `PRIVATE_KEY`
+   (secured/hot key) and `FEE_RECIPIENT`. The `mainnet` network (chainId 1) is
+   already defined in `hardhat.config.js`.
 4. **Deploy:**
    ```bash
    cd contracts
-   npx hardhat run scripts/deploy.js --network <mainnet>   # add the network to hardhat.config.js
+   npx hardhat run scripts/deploy.js --network mainnet
    ```
    Record the printed `TresrzMusic` and `TresrzMarketplace` addresses.
 5. **Verify source** on the block explorer (Etherscan/Blockscout):

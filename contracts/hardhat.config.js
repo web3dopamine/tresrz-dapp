@@ -1,7 +1,7 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("dotenv").config();
 
-const { PRIVATE_KEY, LIBERTY_RPC = "https://rpc.libertychain.org", SEPOLIA_RPC } = process.env;
+const { PRIVATE_KEY, LIBERTY_RPC = "https://rpc.libertychain.org", SEPOLIA_RPC, MAINNET_RPC } = process.env;
 const accounts = PRIVATE_KEY ? [PRIVATE_KEY] : [];
 
 module.exports = {
@@ -12,6 +12,8 @@ module.exports = {
     localhost: { url: "http://127.0.0.1:8545", chainId: 31337, accounts },
     // Liberty Chain (Reth-based sovereign EVM L1, chainId 13370, zero-gas)
     liberty: { url: LIBERTY_RPC, chainId: 13370, accounts, gasPrice: 0 },
-    sepolia: { url: SEPOLIA_RPC || "", chainId: 11155111, accounts }
+    sepolia: { url: SEPOLIA_RPC || "", chainId: 11155111, accounts },
+    // Ethereum mainnet — set MAINNET_RPC + a secured PRIVATE_KEY in contracts/.env.
+    mainnet: { url: MAINNET_RPC || "", chainId: 1, accounts }
   }
 };
