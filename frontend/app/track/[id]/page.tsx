@@ -11,6 +11,15 @@ import { api, type Track, type SaleHistory } from "@/lib/api";
 import { musicAbi, MUSIC_CONTRACT } from "@/lib/abi";
 import { marketAbi, MARKET_CONTRACT } from "@/lib/marketAbi";
 import { useAuth } from "@/lib/auth";
+
+// Block explorer for the active chain (used for on-chain provenance links).
+const CHAIN_ID = Number(process.env.NEXT_PUBLIC_DEFAULT_CHAIN || 31337);
+const EXPLORER =
+  CHAIN_ID === 11155111 ? "https://sepolia.etherscan.io"
+  : CHAIN_ID === 1 ? "https://etherscan.io"
+  : "https://explorer.libertychain.org";
+const EXPLORER_NAME = CHAIN_ID === 11155111 ? "Sepolia Etherscan" : CHAIN_ID === 1 ? "Etherscan" : "the explorer";
+const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 import { useBuyTrack } from "@/lib/useBuyTrack";
 import {
   useBuyListing,
@@ -43,7 +52,7 @@ function Sparkline({ points }: { points: number[] }) {
     .join(" ");
   return (
     <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} style={{ display: "block" }}>
-      <path d={d} fill="none" stroke="var(--crimson, #ff1f4b)" strokeWidth={1.5} />
+      <path d={d} fill="none" stroke="var(--crimson, #f58426)" strokeWidth={1.5} />
     </svg>
   );
 }
@@ -122,6 +131,24 @@ export default function TrackPage() {
     query: { enabled: !!address && chainTokenId != null },
   });
   const ownedQty = ownedBal != null ? Number(ownedBal as bigint) : 0;
+
+  // ---- on-chain provenance: live track record + royalty ----
+  const { data: onchainTrack } = useReadContract({
+    abi: musicAbi, address: MUSIC_CONTRACT, functionName: "tracks",
+    args: chainTokenId != null ? [BigInt(chainTokenId)] : undefined,
+    query: { enabled: chainTokenId != null },
+  });
+  const { data: royaltyData } = useReadContract({
+    abi: musicAbi, address: MUSIC_CONTRACT, functionName: "royaltyInfo",
+    args: chainTokenId != null ? [BigInt(chainTokenId), 10000n] : undefined,
+    query: { enabled: chainTokenId != null },
+  });
+  const chainInfo = useMemo(() => {
+    if (!onchainTrack) return null;
+    const [artist, , maxSupply, minted, , active] = onchainTrack as readonly [string, bigint, bigint, bigint, string, boolean];
+    const royaltyPct = royaltyData ? Number((royaltyData as readonly [string, bigint])[1]) / 100 : null;
+    return { artist, maxSupply: Number(maxSupply), minted: Number(minted), active, royaltyPct };
+  }, [onchainTrack, royaltyData]);
 
   function refreshChain() {
     refetchListings();
@@ -235,6 +262,29 @@ export default function TrackPage() {
               </div>
             </div>
 
+            {/* ---- On-chain provenance ---- */}
+            <div className="sec-title" style={{ marginTop: 34 }}>ON-CHAIN</div>
+            <div className="sec-bar" />
+            {chainTokenId == null ? (
+              <div className="muted-note">This track isn’t on-chain yet.</div>
+            ) : (
+              <div className="tk-panel">
+                <ul className="tk-onchain">
+                  <li><span>Contract</span><a href={`${EXPLORER}/address/${MUSIC_CONTRACT}`} target="_blank" rel="noreferrer">{shortAddr(MUSIC_CONTRACT)} ↗</a></li>
+                  <li><span>Token ID</span><a href={`${EXPLORER}/token/${MUSIC_CONTRACT}?a=${chainTokenId}`} target="_blank" rel="noreferrer">#{chainTokenId} ↗</a></li>
+                  {chainInfo && <li><span>Editions minted</span><b>{chainInfo.minted} / {chainInfo.maxSupply}</b></li>}
+                  {chainInfo && <li><span>Creator</span><Link href={`/artist/${chainInfo.artist}`}>{shortAddr(chainInfo.artist)}</Link></li>}
+                  {chainInfo?.royaltyPct != null && <li><span>Royalty</span><b>{chainInfo.royaltyPct}%</b></li>}
+                  {track.createdAt && <li><span>Minted</span><b>{new Date(track.createdAt).toLocaleString()}</b></li>}
+                  {track.txHash && <li><span>Mint tx</span><a href={`${EXPLORER}/tx/${track.txHash}`} target="_blank" rel="noreferrer">{track.txHash.slice(0, 10)}… ↗</a></li>}
+                  {chainInfo && <li><span>Status</span><b>{chainInfo.active ? "Active" : "Inactive"}</b></li>}
+                </ul>
+                <a className="tk-explorer-link" href={`${EXPLORER}/token/${MUSIC_CONTRACT}?a=${chainTokenId}`} target="_blank" rel="noreferrer">
+                  View mint &amp; full transfer history on {EXPLORER_NAME} ↗
+                </a>
+              </div>
+            )}
+
             {/* ---- Price history ---- */}
             <div className="sec-title" style={{ marginTop: 34 }}>PRICE HISTORY</div>
             <div className="sec-bar" />
@@ -322,27 +372,35 @@ export default function TrackPage() {
       <div className={`toast${msg ? " show" : ""}`}>{msg}</div>
 
       <style jsx>{`
-        .tk-panel { background: linear-gradient(180deg, #170c26, #0f0719); border: 1px solid var(--card-line, rgba(255,31,75,.25)); border-radius: 12px; padding: 18px; margin-top: 6px; }
+        .tk-panel { background: linear-gradient(180deg, #0a1c30, #06121f); border: 1px solid var(--card-line, rgba(245,132,38,.25)); border-radius: 12px; padding: 18px; margin-top: 6px; }
         .tk-spark { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
-        .tk-spark span { font-family: var(--mono, monospace); font-size: 11px; color: var(--muted, #9a8fb0); }
+        .tk-spark span { font-family: var(--mono, monospace); font-size: 11px; color: var(--muted, #bec0c2); }
         .tk-history, .tk-listings { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
-        .tk-history li, .tk-listings li { display: flex; align-items: center; gap: 12px; font-family: var(--mono, monospace); font-size: 13px; padding: 8px 10px; border: 1px solid var(--card-line, rgba(255,31,75,.18)); border-radius: 6px; }
+        .tk-history li, .tk-listings li { display: flex; align-items: center; gap: 12px; font-family: var(--mono, monospace); font-size: 13px; padding: 8px 10px; border: 1px solid var(--card-line, rgba(245,132,38,.18)); border-radius: 6px; }
         .tk-kind { text-transform: uppercase; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; letter-spacing: .05em; }
-        .tk-pri { background: rgba(123,47,247,.25); color: #c9a4ff; }
-        .tk-sec { background: rgba(255,31,75,.22); color: #ff6b8a; }
-        .tk-qty { color: var(--muted, #9a8fb0); }
+        .tk-pri { background: rgba(0,107,182,.25); color: #7fc4ff; }
+        .tk-sec { background: rgba(245,132,38,.22); color: #ffa052; }
+        .tk-qty { color: var(--muted, #bec0c2); }
         .tk-price { font-weight: 700; }
-        .tk-date { margin-left: auto; color: var(--muted, #9a8fb0); }
-        .tk-seller { color: var(--muted, #9a8fb0); font-size: 11px; }
-        .tk-yours { margin-left: auto; color: var(--crimson-soft, #ff6b8a); font-size: 11px; }
+        .tk-date { margin-left: auto; color: var(--muted, #bec0c2); }
+        .tk-seller { color: var(--muted, #bec0c2); font-size: 11px; }
+        .tk-yours { margin-left: auto; color: var(--crimson-soft, #ffa052); font-size: 11px; }
         .tk-listings li > span:first-child { flex: 1; }
         .tk-listings .tk-mini { margin-left: auto; }
         .tk-form { margin-top: 16px; }
-        .tk-form h4 { font-family: var(--mono, monospace); font-size: 11px; letter-spacing: .08em; color: var(--muted, #9a8fb0); margin: 0 0 8px; text-transform: uppercase; }
+        .tk-form h4 { font-family: var(--mono, monospace); font-size: 11px; letter-spacing: .08em; color: var(--muted, #bec0c2); margin: 0 0 8px; text-transform: uppercase; }
         .tk-row { display: flex; gap: 8px; align-items: stretch; }
-        .tk-row input { flex: 1; background: transparent; border: 1.5px solid rgba(255,31,75,.45); color: var(--ink, #fff); font-family: var(--mono, monospace); font-size: 13px; padding: 9px 10px; border-radius: 3px; outline: none; }
-        .tk-row input:focus { border-color: var(--crimson, #ff1f4b); box-shadow: var(--glow); }
+        .tk-row input { flex: 1; background: transparent; border: 1.5px solid rgba(245,132,38,.45); color: var(--ink, #fff); font-family: var(--mono, monospace); font-size: 13px; padding: 9px 10px; border-radius: 3px; outline: none; }
+        .tk-row input:focus { border-color: var(--crimson, #f58426); box-shadow: var(--glow); }
         .tk-mini { width: auto; padding: 9px 16px; font-size: 12px; }
+        .tk-onchain { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0; }
+        .tk-onchain li { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-family: var(--mono, monospace); font-size: 13px; padding: 9px 2px; border-bottom: 1px solid var(--card-line, rgba(245,132,38,.12)); }
+        .tk-onchain li:last-child { border-bottom: none; }
+        .tk-onchain li > span:first-child { color: var(--muted, #bec0c2); text-transform: uppercase; font-size: 11px; letter-spacing: .05em; }
+        .tk-onchain a, .tk-onchain b { color: var(--ink, #fff); font-weight: 700; text-decoration: none; }
+        .tk-onchain a:hover { color: var(--crimson-soft, #ffa052); }
+        .tk-explorer-link { display: inline-block; margin-top: 14px; font-family: var(--mono, monospace); font-size: 12px; color: var(--crimson-soft, #ffa052); text-decoration: none; border: 1px solid rgba(245,132,38,.35); border-radius: 6px; padding: 9px 12px; transition: .2s; }
+        .tk-explorer-link:hover { background: rgba(245,132,38,.12); border-color: var(--crimson, #f58426); }
       `}</style>
     </div>
   );

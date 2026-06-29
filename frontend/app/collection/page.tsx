@@ -129,10 +129,10 @@ export default function CollectionPage() {
       <style jsx>{`
         .col-actions { display: flex; gap: 8px; margin-top: 10px; }
         .col-mini { width: auto; flex: 1; padding: 8px 10px; font-size: 11px; text-align: center; text-decoration: none; }
-        .col-ghost { background: transparent; border: 1.5px solid rgba(255,31,75,.45); color: var(--ink, #fff); }
+        .col-ghost { background: transparent; border: 1.5px solid rgba(245,132,38,.45); color: var(--ink, #fff); }
         .col-xfer { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
-        .col-xfer input { background: transparent; border: 1.5px solid rgba(255,31,75,.45); color: var(--ink, #fff); font-family: var(--mono, monospace); font-size: 12px; padding: 8px 10px; border-radius: 3px; outline: none; width: 100%; }
-        .col-xfer input:focus { border-color: var(--crimson, #ff1f4b); box-shadow: var(--glow); }
+        .col-xfer input { background: transparent; border: 1.5px solid rgba(245,132,38,.45); color: var(--ink, #fff); font-family: var(--mono, monospace); font-size: 12px; padding: 8px 10px; border-radius: 3px; outline: none; width: 100%; }
+        .col-xfer input:focus { border-color: var(--crimson, #f58426); box-shadow: var(--glow); }
         .col-xfer-row { display: flex; gap: 8px; }
         .col-xfer-row input { flex: 1; }
       `}</style>

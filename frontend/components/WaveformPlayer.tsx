@@ -123,7 +123,7 @@ export default function WaveformPlayer({ track }: { track: Track }) {
         const x = i * (w / n);
         const y = (h - ph) / 2;
         const played = i / n <= progress;
-        ctx.fillStyle = played ? "#ff1f4b" : "rgba(255,31,75,0.28)";
+        ctx.fillStyle = played ? "#f58426" : "rgba(245,132,38,0.28)";
         ctx.fillRect(x, y, bw, ph);
       }
     },
@@ -245,8 +245,8 @@ export default function WaveformPlayer({ track }: { track: Track }) {
 
       <style jsx>{`
         .wfp {
-          background: linear-gradient(180deg, #170c26, #0f0719);
-          border: 1px solid var(--card-line, rgba(255, 31, 75, 0.25));
+          background: linear-gradient(180deg, #0a1c30, #06121f);
+          border: 1px solid var(--card-line, rgba(245,132,38, 0.25));
           border-radius: 12px;
           padding: 14px 16px;
           margin: 14px 0;
@@ -261,9 +261,9 @@ export default function WaveformPlayer({ track }: { track: Track }) {
           width: 42px;
           height: 42px;
           border-radius: 50%;
-          border: 1.5px solid var(--crimson, #ff1f4b);
-          background: rgba(255, 31, 75, 0.12);
-          color: var(--crimson, #ff1f4b);
+          border: 1.5px solid var(--crimson, #f58426);
+          background: rgba(245,132,38, 0.12);
+          color: var(--crimson, #f58426);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -271,7 +271,7 @@ export default function WaveformPlayer({ track }: { track: Track }) {
           transition: 0.2s;
         }
         .wfp-btn:hover:not(:disabled) {
-          background: var(--crimson, #ff1f4b);
+          background: var(--crimson, #f58426);
           color: #fff;
         }
         .wfp-btn:disabled {
@@ -310,7 +310,7 @@ export default function WaveformPlayer({ track }: { track: Track }) {
           left: 0;
           bottom: 0;
           height: 3px;
-          background: var(--crimson, #ff1f4b);
+          background: var(--crimson, #f58426);
           box-shadow: var(--glow);
           transition: width 0.1s linear;
         }
@@ -328,7 +328,7 @@ export default function WaveformPlayer({ track }: { track: Track }) {
         .wfp-time {
           font-family: var(--mono, monospace);
           font-size: 12px;
-          color: var(--muted, #9a8fb0);
+          color: var(--muted, #bec0c2);
         }
         .wfp-full {
           font-family: var(--mono, monospace);
@@ -337,14 +337,14 @@ export default function WaveformPlayer({ track }: { track: Track }) {
           letter-spacing: 0.05em;
           color: var(--ink, #fff);
           background: transparent;
-          border: 1.5px solid rgba(255, 31, 75, 0.45);
+          border: 1.5px solid rgba(245,132,38, 0.45);
           border-radius: 3px;
           padding: 7px 12px;
           cursor: pointer;
           transition: 0.2s;
         }
         .wfp-full:hover:not(:disabled) {
-          border-color: var(--crimson, #ff1f4b);
+          border-color: var(--crimson, #f58426);
           box-shadow: var(--glow);
         }
         .wfp-full:disabled {
@@ -354,7 +354,7 @@ export default function WaveformPlayer({ track }: { track: Track }) {
         .wfp-gate {
           margin-top: 10px;
           font-size: 12px;
-          color: var(--crimson-soft, #ff6b8a);
+          color: var(--crimson-soft, #ffa052);
           font-family: var(--mono, monospace);
         }
       `}</style>

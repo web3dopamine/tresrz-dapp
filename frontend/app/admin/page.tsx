@@ -202,28 +202,28 @@ export default function AdminPage() {
 
       <style jsx>{`
         .ad-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
-        .ad-card { background: linear-gradient(180deg, #170c26, #0f0719); border: 1px solid var(--card-line, rgba(255,31,75,.25)); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
-        .ad-card span { font-family: var(--mono, monospace); font-size: 10px; letter-spacing: .08em; color: var(--muted, #9a8fb0); }
+        .ad-card { background: linear-gradient(180deg, #0a1c30, #06121f); border: 1px solid var(--card-line, rgba(245,132,38,.25)); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+        .ad-card span { font-family: var(--mono, monospace); font-size: 10px; letter-spacing: .08em; color: var(--muted, #bec0c2); }
         .ad-card b { font-size: 26px; }
-        .ad-note { font-family: var(--mono, monospace); font-size: 12px; color: var(--muted, #9a8fb0); margin: 8px 0 14px; }
+        .ad-note { font-family: var(--mono, monospace); font-size: 12px; color: var(--muted, #bec0c2); margin: 8px 0 14px; }
         .ad-cfg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
-        .ad-panel { background: linear-gradient(180deg, #170c26, #0f0719); border: 1px solid var(--card-line, rgba(255,31,75,.25)); border-radius: 12px; padding: 18px; }
+        .ad-panel { background: linear-gradient(180deg, #0a1c30, #06121f); border: 1px solid var(--card-line, rgba(245,132,38,.25)); border-radius: 12px; padding: 18px; }
         .ad-panel h4 { margin: 0 0 12px; font-family: var(--mono, monospace); font-size: 12px; letter-spacing: .08em; }
-        .ad-kv { font-family: var(--mono, monospace); font-size: 12px; color: var(--muted, #9a8fb0); margin-bottom: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .ad-kv { font-family: var(--mono, monospace); font-size: 12px; color: var(--muted, #bec0c2); margin-bottom: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         .ad-kv code { color: var(--ink, #fff); word-break: break-all; }
         .ad-kv b { color: var(--ink, #fff); }
-        .ad-you { color: var(--crimson-soft, #ff6b8a); font-style: normal; font-size: 10px; }
+        .ad-you { color: var(--crimson-soft, #ffa052); font-style: normal; font-size: 10px; }
         .ad-row { display: flex; gap: 8px; margin-top: 10px; }
-        .ad-row input { flex: 1; background: transparent; border: 1.5px solid rgba(255,31,75,.45); color: var(--ink, #fff); font-family: var(--mono, monospace); font-size: 12px; padding: 9px 10px; border-radius: 3px; outline: none; }
-        .ad-row input:focus { border-color: var(--crimson, #ff1f4b); box-shadow: var(--glow); }
+        .ad-row input { flex: 1; background: transparent; border: 1.5px solid rgba(245,132,38,.45); color: var(--ink, #fff); font-family: var(--mono, monospace); font-size: 12px; padding: 9px 10px; border-radius: 3px; outline: none; }
+        .ad-row input:focus { border-color: var(--crimson, #f58426); box-shadow: var(--glow); }
         .ad-mini { width: auto; padding: 9px 14px; font-size: 11px; }
         .ad-table { display: flex; flex-direction: column; gap: 6px; }
-        .ad-tr { display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr; gap: 10px; align-items: center; padding: 10px 12px; background: linear-gradient(180deg, #170c26, #0f0719); border: 1px solid var(--card-line, rgba(255,31,75,.18)); border-radius: 6px; font-size: 13px; }
-        .ad-th { background: transparent; border: none; font-family: var(--mono, monospace); font-size: 10px; letter-spacing: .08em; color: var(--muted, #9a8fb0); padding-bottom: 0; }
-        .ad-dim { color: var(--muted, #9a8fb0); font-family: var(--mono, monospace); font-size: 12px; }
-        .ad-toggle { font-family: var(--mono, monospace); font-size: 10px; font-weight: 700; letter-spacing: .05em; padding: 6px 12px; border-radius: 3px; cursor: pointer; background: transparent; border: 1.5px solid rgba(255,31,75,.4); color: var(--muted, #9a8fb0); transition: .2s; }
-        .ad-toggle.on { border-color: var(--crimson, #ff1f4b); color: #fff; box-shadow: var(--glow); }
-        .ad-toggle.danger { border-color: #ff1f4b; color: #ff6b8a; background: rgba(255,31,75,.12); }
+        .ad-tr { display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr; gap: 10px; align-items: center; padding: 10px 12px; background: linear-gradient(180deg, #0a1c30, #06121f); border: 1px solid var(--card-line, rgba(245,132,38,.18)); border-radius: 6px; font-size: 13px; }
+        .ad-th { background: transparent; border: none; font-family: var(--mono, monospace); font-size: 10px; letter-spacing: .08em; color: var(--muted, #bec0c2); padding-bottom: 0; }
+        .ad-dim { color: var(--muted, #bec0c2); font-family: var(--mono, monospace); font-size: 12px; }
+        .ad-toggle { font-family: var(--mono, monospace); font-size: 10px; font-weight: 700; letter-spacing: .05em; padding: 6px 12px; border-radius: 3px; cursor: pointer; background: transparent; border: 1.5px solid rgba(245,132,38,.4); color: var(--muted, #bec0c2); transition: .2s; }
+        .ad-toggle.on { border-color: var(--crimson, #f58426); color: #fff; box-shadow: var(--glow); }
+        .ad-toggle.danger { border-color: #f58426; color: #ffa052; background: rgba(245,132,38,.12); }
       `}</style>
     </div>
   );
