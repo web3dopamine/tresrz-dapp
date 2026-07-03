@@ -11,6 +11,6 @@ done
 HOST=${URL#https://}
 ENVF=/root/tresrz-dapp/backend/.env
 grep -q "$HOST" "$ENVF" && exit 0
-sed -i -E "s|^CORS_ORIGIN=.*|CORS_ORIGIN=\"http://localhost:31337,http://localhost:3000,$URL\"|" "$ENVF"
+sed -i -E "s|^CORS_ORIGIN=.*|CORS_ORIGIN=\"http://localhost:31337,http://localhost:3000,https://mvp.tresrz.com,$URL\"|" "$ENVF"
 sed -i -E "s|^SIWE_DOMAIN=.*|SIWE_DOMAIN=\"$HOST\"|" "$ENVF"
 systemctl restart tresrz-backend
