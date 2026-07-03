@@ -85,15 +85,25 @@ export default function CollectionPage() {
               const open = xfer?.tokenId === tokenId;
               return (
                 <div key={tokenId} className="card">
-                  <Link href={track ? `/track/${track.id}` : "#"} className="art" style={{ marginBottom: 11, textDecoration: "none", display: "block" }}>
-                    <CoverArt seed={track?.coverSeed ?? tokenId} />
-                    <div className="genre">{track?.genre || `TOKEN #${tokenId}`}</div>
-                    <span className="owned-badge">×{qty}</span>
-                  </Link>
-                  <h3>
-                    <Link href={track ? `/track/${track.id}` : "#"} style={{ color: "inherit", textDecoration: "none" }}>
-                      {track?.title || `Token #${tokenId}`}
+                  {track ? (
+                    <Link href={`/track/${track.id}`} className="art" style={{ marginBottom: 11, textDecoration: "none", display: "block" }}>
+                      <CoverArt seed={track.coverSeed} />
+                      <div className="genre">{track.genre}</div>
+                      <span className="owned-badge">×{qty}</span>
                     </Link>
+                  ) : (
+                    <div className="art" style={{ marginBottom: 11 }}>
+                      <CoverArt seed={tokenId} />
+                      <div className="genre">{`TOKEN #${tokenId}`}</div>
+                      <span className="owned-badge">×{qty}</span>
+                    </div>
+                  )}
+                  <h3>
+                    {track ? (
+                      <Link href={`/track/${track.id}`} style={{ color: "inherit", textDecoration: "none" }}>{track.title}</Link>
+                    ) : (
+                      `Token #${tokenId}`
+                    )}
                   </h3>
                   {track && (
                     <div className="by"><img src={avatarUrl(track.artist.avatarSeed)} alt="" /><span>by <b>{track.artist.handle}</b></span></div>

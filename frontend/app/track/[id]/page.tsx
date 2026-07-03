@@ -563,6 +563,20 @@ export default function TrackPage() {
         .tk-onchain a:hover { color: var(--crimson-soft, #ffa052); }
         .tk-explorer-link { display: inline-block; margin-top: 14px; font-family: var(--mono, monospace); font-size: 12px; color: var(--crimson-soft, #ffa052); text-decoration: none; border: 1px solid rgba(245,132,38,.35); border-radius: 6px; padding: 9px 12px; transition: .2s; }
         .tk-explorer-link:hover { background: rgba(245,132,38,.12); border-color: var(--crimson, #f58426); }
+        @media (max-width: 640px) {
+          .tk-panel { padding: 14px; }
+          .tk-listing-row { flex-wrap: wrap; row-gap: 8px; }
+          .tk-listing-row > span:first-child { flex: 1 1 100%; }
+          .tk-own-actions { margin-left: 0; width: 100%; justify-content: flex-end; }
+          .tk-listings .tk-mini { margin-left: auto; }
+          .tk-row { flex-wrap: wrap; }
+          .tk-row input { flex: 1 1 40%; min-width: 110px; }
+          .tk-row .tk-mini { flex: 1 1 100%; }
+          .tk-onchain li { flex-wrap: wrap; row-gap: 2px; }
+          .tk-onchain a, .tk-onchain b { word-break: break-all; text-align: right; }
+          .tk-history li { flex-wrap: wrap; row-gap: 4px; }
+          .tk-spark { flex-wrap: wrap; }
+        }
       `}</style>
     </div>
   );

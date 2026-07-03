@@ -224,6 +224,14 @@ export default function AdminPage() {
         .ad-toggle { font-family: var(--mono, monospace); font-size: 10px; font-weight: 700; letter-spacing: .05em; padding: 6px 12px; border-radius: 3px; cursor: pointer; background: transparent; border: 1.5px solid rgba(245,132,38,.4); color: var(--muted, #bec0c2); transition: .2s; }
         .ad-toggle.on { border-color: var(--crimson, #f58426); color: var(--ink, #fff); box-shadow: var(--glow); }
         .ad-toggle.danger { border-color: #f58426; color: #ffa052; background: rgba(245,132,38,.12); }
+        @media (max-width: 640px) {
+          .ad-th { display: none; }
+          .ad-tr { grid-template-columns: 1fr 1fr; row-gap: 8px; }
+          .ad-tr > span:first-child { grid-column: 1 / -1; font-weight: 700; }
+          .ad-row { flex-wrap: wrap; }
+          .ad-row input { flex: 1 1 100%; }
+          .ad-card b { font-size: 20px; }
+        }
       `}</style>
     </div>
   );

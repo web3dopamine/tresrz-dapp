@@ -12,6 +12,7 @@ export default function Header({ search, setSearch }: { search?: string; setSear
   const { token, signIn, signOut, loading } = useAuth();
   const { theme, toggle } = useTheme();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // NOTE: SIWE sign-in is explicit (the "SIGN IN" button below) — we no longer
   // auto-prompt on connect, so MetaMask doesn't pop a signature on every refresh.
@@ -40,6 +41,29 @@ export default function Header({ search, setSearch }: { search?: string; setSear
         {isConnected && address && <Link href={`/profile/${address}`}>PROFILE</Link>}
         {isAdmin && <Link href="/admin">ADMIN</Link>}
       </nav>
+      <button
+        className="nav-burger"
+        onClick={() => setMenuOpen((v) => !v)}
+        aria-label="Open menu"
+        aria-expanded={menuOpen}
+      >
+        {menuOpen ? (
+          <svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" /></svg>
+        ) : (
+          <svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" /></svg>
+        )}
+      </button>
+      {menuOpen && (
+        <div className="mobile-menu" onClick={() => setMenuOpen(false)}>
+          <Link href="/#hot">MARKETPLACE</Link>
+          <Link href="/#latest">DROPS</Link>
+          <Link href="/#popular">ARTISTS</Link>
+          <Link href="/mint">MINT</Link>
+          <Link href="/collection">COLLECTION</Link>
+          {isConnected && address && <Link href={`/profile/${address}`}>PROFILE</Link>}
+          {isAdmin && <Link href="/admin">ADMIN</Link>}
+        </div>
+      )}
       <button
         className="theme-toggle"
         onClick={toggle}

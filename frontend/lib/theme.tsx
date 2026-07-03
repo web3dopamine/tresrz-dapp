@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 type Theme = "dark" | "light";
 
 const ThemeCtx = createContext<{ theme: Theme; toggle: () => void }>({
-  theme: "dark",
+  theme: "light",
   toggle: () => {},
 });
 
@@ -18,7 +18,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       const t = document.documentElement.dataset.theme;
       if (t === "light" || t === "dark") return t;
     }
-    return "dark";
+    return "light";
   });
 
   useEffect(() => {

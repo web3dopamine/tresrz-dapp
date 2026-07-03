@@ -55,6 +55,16 @@ nav a:hover{color:var(--crimson-soft)}nav a:hover::after{width:100%}
 .theme-toggle span:first-child{font-size:13px;line-height:1;color:var(--crimson)}
 .theme-toggle:hover{border-color:var(--crimson);box-shadow:var(--glow);transform:translateY(-1px)}
 .auth-area{display:flex;align-items:center;gap:14px;border-left:1px solid var(--line);padding-left:20px}
+/* --- mobile nav (burger + dropdown panel) --- */
+.nav-burger{display:none;align-items:center;justify-content:center;width:42px;height:42px;flex-shrink:0;background:transparent;border:1.5px solid var(--card-line);border-radius:4px;color:var(--ink);cursor:pointer;transition:.2s}
+.nav-burger:hover{border-color:var(--crimson);color:var(--crimson)}
+.mobile-menu{position:absolute;top:100%;left:0;right:0;z-index:60;display:flex;flex-direction:column;background:var(--header-bg);backdrop-filter:blur(14px);border-bottom:1px solid var(--card-line);padding:8px 0 12px;box-shadow:0 14px 30px rgba(0,0,0,.25)}
+.mobile-menu a{color:var(--ink);text-decoration:none;font-size:13px;font-weight:700;letter-spacing:1.5px;padding:13px 24px;border-bottom:1px solid var(--line-soft);transition:.15s}
+.mobile-menu a:last-child{border-bottom:none}
+.mobile-menu a:hover{color:var(--crimson-soft);padding-left:30px}
+[data-theme="light"] .nav-burger{border:2px solid var(--navy);color:var(--navy)}
+[data-theme="light"] .mobile-menu{background:#fff;backdrop-filter:none;border-bottom:3px solid var(--navy);box-shadow:0 10px 24px rgba(10,37,64,.15)}
+[data-theme="light"] .mobile-menu a{color:var(--navy)}
 .hero{text-align:center;padding:46px 20px 18px}
 .hero h1{font-family:var(--display);font-size:clamp(70px,13vw,168px);line-height:.86;color:var(--crimson);letter-spacing:4px;text-shadow:0 0 30px rgba(245,132,38,.55),0 0 70px rgba(0,107,182,.3);animation:flick 6s infinite}
 @keyframes flick{0%,97%,100%{opacity:1}98%{opacity:.7}99%{opacity:.95}}
@@ -94,6 +104,9 @@ section.block{padding:40px 34px}
 .card-heart small{font-size:11px}
 .owned-badge{position:absolute;top:8px;right:8px;background:var(--crimson);color:#fff;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;box-shadow:var(--glow)}
 .pop-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
+/* grid children may never force the track wider than its 1fr share */
+.hot-cards>*,.pop-grid>*,.latest-grid>*,.artist-grid>*{min-width:0}
+.creator{min-width:0}
 .creator{display:flex;align-items:center;gap:12px;background:var(--panel-bg);border:1px solid var(--line-soft);border-radius:8px;padding:14px;transition:.2s;cursor:pointer}
 .creator:hover{border-color:var(--crimson);background:var(--panel-bg-2)}
 .creator img{width:42px;height:42px;border-radius:50%;flex-shrink:0;border:1px solid var(--card-line)}
@@ -180,8 +193,24 @@ footer{margin-top:30px;border-top:1px solid var(--card-line);padding:40px 34px 6
 .artist-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:18px}
 @media(max-width:1100px){.artist-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:720px){.artist-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:1100px){.hot-cards,.pop-grid,.latest-grid{grid-template-columns:repeat(3,1fr)}nav{display:none}.theme-toggle{margin-left:auto}}
-@media(max-width:720px){header{flex-wrap:wrap;padding:12px 16px;gap:12px}.search{flex:1 1 100%;order:3}.lang{margin-left:0}.theme-toggle{margin-left:auto}.auth-area{padding-left:0;border:none}section.block{padding:30px 16px}.hot-cards,.pop-grid,.latest-grid{grid-template-columns:repeat(2,1fr)}.hot-label{flex-basis:30px}.hot-label span{font-size:18px}}
+@media(max-width:1100px){.hot-cards,.pop-grid,.latest-grid{grid-template-columns:repeat(3,1fr)}nav{display:none}.nav-burger{display:flex}.theme-toggle{margin-left:auto}}
+@media(max-width:720px){header{flex-wrap:wrap;padding:12px 16px;gap:10px}.search{flex:1 1 100%;order:3}.lang{margin-left:0}.theme-toggle{margin-left:auto}.auth-area{padding-left:0;border:none;gap:8px}section.block{padding:30px 16px}.hot-cards,.pop-grid,.latest-grid{grid-template-columns:repeat(2,1fr)}.hot-label{flex-basis:30px}.hot-label span{font-size:18px}.hot-row{gap:10px}footer{padding:30px 16px 46px}.foot-top{gap:26px}}
+@media(max-width:480px){
+  .theme-toggle span:last-child{display:none}
+  .theme-toggle{padding:8px 10px}
+  .mint-row{grid-template-columns:1fr}
+  .detail-stats{grid-template-columns:1fr 1fr;gap:8px}
+  .detail-actions{flex-wrap:wrap}
+  .detail-actions .buy{flex:1 1 auto}
+  .hero h1{letter-spacing:2px}
+  [data-theme="light"] .hero{margin:12px 12px 4px;padding:40px 14px 30px;box-shadow:6px 6px 0 var(--navy)}
+  .cookie{width:calc(100% - 24px);left:12px;bottom:12px;border:1px solid var(--card-line);border-radius:10px}
+  [data-theme="light"] .cookie{border:2px solid var(--navy)}
+  .toast{width:calc(100% - 32px);text-align:center}
+  .artist-grid{grid-template-columns:1fr 1fr;gap:10px}
+  .hot-cards,.pop-grid,.latest-grid{gap:10px}
+  .genre-filter{padding:0 12px}
+}
 
 /* ============================================================
    LIGHT MODE — "New York Basketball" flat blocks / poster look
