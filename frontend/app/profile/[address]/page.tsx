@@ -100,7 +100,7 @@ export default function ProfilePage() {
       <style jsx>{`
         .pf-tabs { display: flex; gap: 6px; }
         .pf-tabs button { font-family: var(--mono, monospace); font-size: 12px; font-weight: 700; letter-spacing: .08em; color: var(--muted, #bec0c2); background: transparent; border: 1.5px solid var(--card-line, rgba(245,132,38,.25)); border-radius: 3px; padding: 8px 18px; cursor: pointer; transition: .2s; }
-        .pf-tabs button.on { color: #fff; border-color: var(--crimson, #f58426); box-shadow: var(--glow); }
+        .pf-tabs button.on { color: var(--ink, #fff); border-color: var(--crimson, #f58426); box-shadow: var(--glow); }
       `}</style>
     </div>
   );

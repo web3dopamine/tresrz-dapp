@@ -30,6 +30,7 @@ export default function Home() {
   const [latest, setLatest] = useState<Track[]>(DEMO_LATEST);
   const [artists, setArtists] = useState<Artist[]>(DEMO_ARTISTS);
   const [search, setSearch] = useState("");
+  const [genre, setGenre] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
   const tRef = useRef<any>(null);
 
@@ -42,9 +43,15 @@ export default function Home() {
   }, []);
 
   const q = search.toLowerCase();
-  const fHot = useMemo(() => hot.filter((t) => (t.title + t.artist.handle).toLowerCase().includes(q)), [hot, q]);
-  const fLatest = useMemo(() => latest.filter((t) => (t.title + t.artist.handle).toLowerCase().includes(q)), [latest, q]);
+  const matches = (t: Track) =>
+    (t.title + t.artist.handle).toLowerCase().includes(q) && (!genre || t.genre === genre);
+  const fHot = useMemo(() => hot.filter(matches), [hot, q, genre]);
+  const fLatest = useMemo(() => latest.filter(matches), [latest, q, genre]);
   const fArtists = useMemo(() => artists.filter((a) => a.handle.toLowerCase().includes(q)), [artists, q]);
+  const genres = useMemo(
+    () => Array.from(new Set([...hot, ...latest].map((t) => t.genre))).sort(),
+    [hot, latest],
+  );
 
   return (
     <div className="wrap">
@@ -56,11 +63,21 @@ export default function Home() {
         <div className="hero-rule" />
       </div>
 
+      <div className="genre-filter" id="genres">
+        <button className={`genre-chip${genre === null ? " active" : ""}`} onClick={() => setGenre(null)}>ALL</button>
+        {genres.map((g) => (
+          <button key={g} className={`genre-chip${genre === g ? " active" : ""}`} onClick={() => setGenre(genre === g ? null : g)}>
+            {g}
+          </button>
+        ))}
+      </div>
+
       <section className="block" id="hot">
         <div className="hot-row">
           <div className="hot-label"><span>HOT TRACKS</span></div>
           <div className="hot-cards">
-            {fHot.map((t) => <TrackCard key={t.id} t={t} toast={toast} />)}
+            {fHot.length === 0 ? <div className="muted-note">No hot tracks match your search/filter.</div>
+              : fHot.map((t) => <TrackCard key={t.id} t={t} toast={toast} />)}
           </div>
         </div>
       </section>
@@ -74,7 +91,10 @@ export default function Home() {
       <section className="block" id="latest">
         <div className="sec-title">LATEST DROPS</div>
         <div className="sec-bar" />
-        <div className="latest-grid">{fLatest.map((t) => <DropCard key={t.id} t={t} />)}</div>
+        <div className="latest-grid">
+          {fLatest.length === 0 ? <div className="muted-note">No drops match your search/filter.</div>
+            : fLatest.map((t) => <DropCard key={t.id} t={t} />)}
+        </div>
       </section>
 
       <footer>
@@ -83,9 +103,9 @@ export default function Home() {
             <div className="logo"><div className="bars"><span /><span /><span /><span /></div><b>TRES<span>RZ</span></b></div>
             <p>The marketplace where music becomes property. Mint your masters, sell limited editions, and let fans truly own the sound.</p>
           </div>
-          <div className="foot-col"><h5>MARKET</h5><a href="#hot">Explore</a><a href="#latest">Latest drops</a><a href="#popular">Top artists</a><a href="#hot">Genres</a></div>
-          <div className="foot-col"><h5>CREATE</h5><Link href="/mint">Mint a track</Link><a href="#popular">Royalties</a><a href="#popular">Certifications</a><a href="#hot">Docs</a></div>
-          <div className="foot-col"><h5>COMPANY</h5><a href="#">About</a><a href="#">Blog</a><a href="#">Careers</a><a href="#">Contact</a></div>
+          <div className="foot-col"><h5>MARKET</h5><a href="#hot">Explore</a><a href="#latest">Latest drops</a><a href="#popular">Top artists</a><a href="#genres">Genres</a></div>
+          <div className="foot-col"><h5>CREATE</h5><Link href="/mint">Mint a track</Link><Link href="/about#royalties">Royalties</Link><Link href="/about#docs">How it works</Link><Link href="/collection">Your collection</Link></div>
+          <div className="foot-col"><h5>COMPANY</h5><Link href="/about">About</Link><Link href="/about#contact">Contact</Link><Link href="/about#docs">Docs</Link></div>
         </div>
         <div className="foot-bottom"><span>© 2026 TRESRZ — All rights reserved</span><span>TERMS · PRIVACY · COOKIES</span></div>
       </footer>

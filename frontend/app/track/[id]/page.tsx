@@ -22,13 +22,18 @@ const EXPLORER_NAME = CHAIN_ID === 11155111 ? "Sepolia Etherscan" : CHAIN_ID ===
 const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 import { useBuyTrack } from "@/lib/useBuyTrack";
 import {
+  useAcceptOffer,
   useBuyListing,
+  useCancelListing,
+  useCancelOffer,
   useListTrack,
   useMakeOffer,
   useTransfer,
+  useUpdateListing,
 } from "@/lib/useMarket";
 
 type Listing = { id: number; seller: string; tokenId: number; qty: number; unit: bigint };
+type Offer = { id: number; buyer: string; tokenId: number; qty: number; unit: bigint };
 
 function ethStr(wei: bigint | string, dp = 3): string {
   try {
@@ -67,6 +72,10 @@ export default function TrackPage() {
   const { list, busy: listing } = useListTrack();
   const { makeOffer, busy: offering } = useMakeOffer();
   const { transfer, busy: transferring } = useTransfer();
+  const { accept: acceptOffer, busy: accepting } = useAcceptOffer();
+  const { cancel: cancelOffer, busy: cancellingOffer } = useCancelOffer();
+  const { cancel: cancelListing, busy: cancellingListing } = useCancelListing();
+  const { update: updateListing, busy: updatingListing } = useUpdateListing();
 
   const [track, setTrack] = useState<Track | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "missing">("loading");
@@ -82,6 +91,8 @@ export default function TrackPage() {
   const [listPrice, setListPrice] = useState("0.1");
   const [xferTo, setXferTo] = useState("");
   const [xferQty, setXferQty] = useState("1");
+  // inline edit of one of your own listings: null = closed
+  const [editListing, setEditListing] = useState<{ id: number; qty: string; price: string } | null>(null);
 
   function toast(m: string) { setMsg(m); clearTimeout(tRef.current); tRef.current = setTimeout(() => setMsg(""), 2400); }
 
@@ -125,6 +136,38 @@ export default function TrackPage() {
     return out;
   }, [listingData, chainTokenId]);
 
+  // ---- on-chain reads: open offers scan (same pattern as listings) ----
+  const { data: nextOfferId } = useReadContract({
+    abi: marketAbi, address: MARKET_CONTRACT, functionName: "nextOfferId",
+    query: { enabled: chainTokenId != null },
+  });
+  const maxOfferId = nextOfferId ? Number(nextOfferId) - 1 : 0;
+
+  const offerCalls = useMemo(() => {
+    if (chainTokenId == null || maxOfferId < 1) return [];
+    return Array.from({ length: maxOfferId }, (_, i) => ({
+      abi: marketAbi, address: MARKET_CONTRACT, functionName: "offers" as const, args: [BigInt(i + 1)] as const,
+    }));
+  }, [chainTokenId, maxOfferId]);
+
+  const { data: offerData, refetch: refetchOffers } = useReadContracts({
+    contracts: offerCalls,
+    query: { enabled: offerCalls.length > 0 },
+  });
+
+  const offers: Offer[] = useMemo(() => {
+    if (!offerData || chainTokenId == null) return [];
+    const out: Offer[] = [];
+    offerData.forEach((r, i) => {
+      if (r.status !== "success" || !r.result) return;
+      const [buyer, tokenId, qty, unit, , active] = r.result as readonly [string, bigint, bigint, bigint, bigint, boolean];
+      if (active && Number(tokenId) === chainTokenId && Number(qty) > 0) {
+        out.push({ id: i + 1, buyer, tokenId: Number(tokenId), qty: Number(qty), unit });
+      }
+    });
+    return out;
+  }, [offerData, chainTokenId]);
+
   const { data: ownedBal, refetch: refetchBalance } = useReadContract({
     abi: musicAbi, address: MUSIC_CONTRACT, functionName: "balanceOf",
     args: address && chainTokenId != null ? [address, BigInt(chainTokenId)] : undefined,
@@ -152,6 +195,7 @@ export default function TrackPage() {
 
   function refreshChain() {
     refetchListings();
+    refetchOffers();
     refetchBalance();
     load();
   }
@@ -160,7 +204,7 @@ export default function TrackPage() {
     if (!track) return;
     const res = await buy(track);
     if (!res.ok) return toast(res.error);
-    toast(`Bought ${track.title} ✓`);
+    toast(res.warn ? `⚠ ${res.warn}` : `Bought ${track.title} ✓`);
     api.track(id).then((t) => setTrack(t)).catch(() => {});
   }
 
@@ -168,7 +212,39 @@ export default function TrackPage() {
     if (!track) return;
     const res = await buyListing(l.id, l.qty, l.unit, track.id);
     if (!res.ok) return toast(res.error);
-    toast("Purchased from marketplace ✓");
+    toast(res.warn ? `⚠ ${res.warn}` : "Purchased from marketplace ✓");
+    refreshChain();
+  }
+
+  async function onAcceptOffer(o: Offer) {
+    if (!track) return;
+    const res = await acceptOffer(o.id, track.id, o.qty);
+    if (!res.ok) return toast(res.error);
+    toast(res.warn ? `⚠ ${res.warn}` : `Offer accepted — ${ethStr(o.unit * BigInt(o.qty))} ETH received ✓`);
+    refreshChain();
+  }
+
+  async function onCancelOffer(o: Offer) {
+    const res = await cancelOffer(o.id);
+    if (!res.ok) return toast(res.error);
+    toast("Offer cancelled — escrow refunded ✓");
+    refreshChain();
+  }
+
+  async function onCancelListing(listingId: number) {
+    const res = await cancelListing(listingId);
+    if (!res.ok) return toast(res.error);
+    setEditListing(null);
+    toast("Listing cancelled ✓");
+    refreshChain();
+  }
+
+  async function onUpdateListing() {
+    if (!editListing) return;
+    const res = await updateListing(editListing.id, Number(editListing.qty) || 1, editListing.price);
+    if (!res.ok) return toast(res.error);
+    setEditListing(null);
+    toast("Listing updated ✓");
     refreshChain();
   }
 
@@ -319,21 +395,99 @@ export default function TrackPage() {
                   <div className="muted-note">No active listings for this token.</div>
                 ) : (
                   <ul className="tk-listings">
-                    {listings.map((l) => (
-                      <li key={l.id}>
-                        <span><b>{l.qty}</b> edition{l.qty > 1 ? "s" : ""} @ <b>{ethStr(l.unit)} ETH</b></span>
-                        <span className="tk-seller">seller {l.seller.slice(0, 6)}…{l.seller.slice(-4)}</span>
-                        {address && l.seller.toLowerCase() === address.toLowerCase() ? (
-                          <span className="tk-yours">your listing</span>
-                        ) : (
-                          <button className="buy tk-mini" disabled={buyingListing} onClick={() => onBuyListing(l)}>
-                            {buyingListing ? "…" : "BUY"}
-                          </button>
-                        )}
-                      </li>
-                    ))}
+                    {listings.map((l) => {
+                      const mine = address && l.seller.toLowerCase() === address.toLowerCase();
+                      return (
+                        <li key={l.id} className={editListing?.id === l.id ? "tk-editing" : undefined}>
+                          <div className="tk-listing-row">
+                            <span><b>{l.qty}</b> edition{l.qty > 1 ? "s" : ""} @ <b>{ethStr(l.unit)} ETH</b></span>
+                            <span className="tk-seller">seller {l.seller.slice(0, 6)}…{l.seller.slice(-4)}</span>
+                            {mine ? (
+                              <span className="tk-own-actions">
+                                <span className="tk-yours">your listing</span>
+                                <button
+                                  className="buy tk-mini tk-ghost"
+                                  disabled={updatingListing || cancellingListing}
+                                  onClick={() =>
+                                    setEditListing(
+                                      editListing?.id === l.id
+                                        ? null
+                                        : { id: l.id, qty: String(l.qty), price: formatEther(l.unit) },
+                                    )
+                                  }
+                                >
+                                  {editListing?.id === l.id ? "CLOSE" : "EDIT"}
+                                </button>
+                                <button className="buy tk-mini tk-danger" disabled={cancellingListing} onClick={() => onCancelListing(l.id)}>
+                                  {cancellingListing ? "…" : "CANCEL"}
+                                </button>
+                              </span>
+                            ) : (
+                              <button className="buy tk-mini" disabled={buyingListing} onClick={() => onBuyListing(l)}>
+                                {buyingListing ? "…" : "BUY"}
+                              </button>
+                            )}
+                          </div>
+                          {mine && editListing?.id === l.id && (
+                            <div className="tk-row tk-edit-row">
+                              <input
+                                type="number" min={1} step={1} value={editListing.qty}
+                                onChange={(e) => setEditListing({ ...editListing, qty: e.target.value })}
+                                placeholder="qty"
+                              />
+                              <input
+                                type="number" min={0} step="0.001" value={editListing.price}
+                                onChange={(e) => setEditListing({ ...editListing, price: e.target.value })}
+                                placeholder="ETH / unit"
+                              />
+                              <button className="buy tk-mini" disabled={updatingListing} onClick={onUpdateListing}>
+                                {updatingListing ? "…" : "SAVE"}
+                              </button>
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
+
+                {/* ---- open offers: buyers can cancel theirs, holders can accept ---- */}
+                <div className="tk-form">
+                  <h4>OPEN OFFERS</h4>
+                  {offers.length === 0 ? (
+                    <div className="muted-note">No open offers for this token.</div>
+                  ) : (
+                    <ul className="tk-listings">
+                      {offers.map((o) => {
+                        const mine = address && o.buyer.toLowerCase() === address.toLowerCase();
+                        return (
+                          <li key={o.id}>
+                            <div className="tk-listing-row">
+                              <span><b>{o.qty}</b> edition{o.qty > 1 ? "s" : ""} @ <b>{ethStr(o.unit)} ETH</b> <small className="tk-seller">({ethStr(o.unit * BigInt(o.qty))} ETH total, escrowed)</small></span>
+                              <span className="tk-seller">from {o.buyer.slice(0, 6)}…{o.buyer.slice(-4)}</span>
+                              {mine ? (
+                                <span className="tk-own-actions">
+                                  <span className="tk-yours">your offer</span>
+                                  <button className="buy tk-mini tk-danger" disabled={cancellingOffer} onClick={() => onCancelOffer(o)}>
+                                    {cancellingOffer ? "…" : "CANCEL"}
+                                  </button>
+                                </span>
+                              ) : ownedQty >= o.qty ? (
+                                <button className="buy tk-mini" disabled={accepting} onClick={() => onAcceptOffer(o)}>
+                                  {accepting ? "…" : "ACCEPT"}
+                                </button>
+                              ) : (
+                                <span className="tk-yours" title={`You need ${o.qty} edition${o.qty > 1 ? "s" : ""} to accept`}>
+                                  need {o.qty} to accept
+                                </span>
+                              )}
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
 
                 <div className="tk-form">
                   <h4>MAKE AN OFFER</h4>
@@ -372,11 +526,19 @@ export default function TrackPage() {
       <div className={`toast${msg ? " show" : ""}`}>{msg}</div>
 
       <style jsx>{`
-        .tk-panel { background: linear-gradient(180deg, #0a1c30, #06121f); border: 1px solid var(--card-line, rgba(245,132,38,.25)); border-radius: 12px; padding: 18px; margin-top: 6px; }
+        .tk-panel { background: var(--card-grad); border: 1px solid var(--card-line, rgba(245,132,38,.25)); border-radius: 12px; padding: 18px; margin-top: 6px; }
         .tk-spark { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
         .tk-spark span { font-family: var(--mono, monospace); font-size: 11px; color: var(--muted, #bec0c2); }
         .tk-history, .tk-listings { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
-        .tk-history li, .tk-listings li { display: flex; align-items: center; gap: 12px; font-family: var(--mono, monospace); font-size: 13px; padding: 8px 10px; border: 1px solid var(--card-line, rgba(245,132,38,.18)); border-radius: 6px; }
+        .tk-history li, .tk-listings li { font-family: var(--mono, monospace); font-size: 13px; padding: 8px 10px; border: 1px solid var(--card-line, rgba(245,132,38,.18)); border-radius: 6px; }
+        .tk-history li { display: flex; align-items: center; gap: 12px; }
+        .tk-listing-row { display: flex; align-items: center; gap: 12px; }
+        .tk-own-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+        .tk-own-actions .tk-yours { margin-left: 0; }
+        .tk-ghost { background: transparent; }
+        .tk-danger { background: transparent; border-color: rgba(255,80,80,.5); color: #ff7070; }
+        .tk-danger:hover:not(:disabled) { border-color: #ff5050; background: rgba(255,80,80,.12); }
+        .tk-edit-row { margin-top: 8px; }
         .tk-kind { text-transform: uppercase; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; letter-spacing: .05em; }
         .tk-pri { background: rgba(0,107,182,.25); color: #7fc4ff; }
         .tk-sec { background: rgba(245,132,38,.22); color: #ffa052; }

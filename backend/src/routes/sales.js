@@ -74,7 +74,9 @@ r.post("/", requireAuth, async (req, res) => {
 // POST /api/sales/secondary  -> record a confirmed secondary-market sale
 // (fixed-price listing buy or accepted offer), verified on-chain against the
 // TresrzMarketplace Sale / OfferAccepted events. The authenticated wallet must
-// be the buyer. Does NOT touch `minted` (no new editions are created on resale).
+// be the buyer OR the seller of the event (a listing buy is recorded by the
+// buyer; an accepted offer by the seller — the offer maker isn't online then).
+// Does NOT touch `minted` (no new editions are created on resale).
 r.post("/secondary", requireAuth, async (req, res) => {
   const { trackId, qty, txHash } = req.body || {};
   if (typeof trackId !== "string" || !trackId) return res.status(400).json({ error: "trackId required" });
@@ -90,22 +92,25 @@ r.post("/secondary", requireAuth, async (req, res) => {
   const v = await verifySecondarySale({
     txHash,
     expectedTokenId: track.chainTokenId,
-    expectedBuyer: req.user.address,
+    expectedParty: req.user.address,
     expectedQty: q,
   });
   if (!v.ok) return res.status(400).json({ error: "secondary sale not verified on-chain", reason: v.reason });
 
   try {
-    // resolve (or create) the seller user from the on-chain seller address
-    const sellerAddr = v.seller;
-    const seller = sellerAddr
-      ? await prisma.user.upsert({ where: { address: sellerAddr }, update: {}, create: { address: sellerAddr } })
-      : null;
+    // resolve (or create) buyer + seller users from the on-chain event — the
+    // authenticated wallet is one of them, the counterparty may be unknown to us
+    const [buyer, seller] = await Promise.all([
+      prisma.user.upsert({ where: { address: v.buyer }, update: {}, create: { address: v.buyer } }),
+      v.seller
+        ? prisma.user.upsert({ where: { address: v.seller }, update: {}, create: { address: v.seller } })
+        : Promise.resolve(null),
+    ]);
 
     const sale = await prisma.sale.create({
       data: {
         trackId,
-        buyerId: req.user.id,
+        buyerId: buyer.id,
         sellerId: seller?.id || null,
         kind: v.kind, // secondary_listing | secondary_offer
         qty: q,

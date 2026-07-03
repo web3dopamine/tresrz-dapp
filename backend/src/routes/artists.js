@@ -18,11 +18,15 @@ const shapeTrack = (t, userId) => ({
   artist: { id: t.artist.id, handle: t.artist.handle || t.artist.address.slice(0, 6) + "…", address: t.artist.address, avatarSeed: t.artist.avatarSeed },
   likes: t._count?.likes ?? 0,
   liked: userId ? t.likes?.some((l) => l.userId === userId) : false,
+  txHash: t.txHash,
+  createdAt: t.createdAt,
 });
 
-// GET /api/artists  -> popular artists w/ track + like counts
+// GET /api/artists  -> popular artists w/ track + like counts (flagged users
+// are moderated out of public discovery)
 r.get("/", async (_req, res) => {
   const users = await prisma.user.findMany({
+    where: { flagged: false },
     include: { _count: { select: { tracks: true } }, tracks: { include: { _count: { select: { likes: true } } } } },
     take: 50,
   });

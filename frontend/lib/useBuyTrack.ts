@@ -6,7 +6,7 @@ import { api, type Track } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
 export type BuyResult =
-  | { ok: true; hash: `0x${string}` }
+  | { ok: true; hash: `0x${string}`; warn?: string }
   | { ok: false; error: string };
 
 /**
@@ -34,8 +34,13 @@ export function useBuyTrack() {
         value,
       });
       await publicClient?.waitForTransactionReceipt({ hash });
-      await api.recordSale({ trackId: t.id, qty, priceWei: t.priceWei, txHash: hash });
-      return { ok: true, hash };
+      // the on-chain buy succeeded — a failure to record it must not read as a failed purchase
+      try {
+        await api.recordSale({ trackId: t.id, qty, priceWei: t.priceWei, txHash: hash });
+        return { ok: true, hash };
+      } catch {
+        return { ok: true, hash, warn: "Purchase confirmed on-chain, but recording it to the catalog failed" };
+      }
     } catch (e: any) {
       return { ok: false, error: e?.shortMessage || e?.message || "Purchase cancelled" };
     } finally {

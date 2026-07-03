@@ -36,6 +36,7 @@ export type Track = {
   priceWei: string; maxSupply: number; minted: number; left: number; hot: boolean; flagged?: boolean;
   artist: { id: string; handle: string; address: string; avatarSeed: number };
   likes: number; liked: boolean;
+  txHash?: string | null; createdAt?: string;
 };
 export type Artist = { id: string; handle: string; address: string; avatarSeed: number; nftCount: number; likes: number };
 export type ArtistDetail = { id: string; handle: string; address: string; avatarSeed: number; bio: string | null; nftCount: number; totalLikes: number; tracks: Track[] };

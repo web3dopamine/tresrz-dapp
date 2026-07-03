@@ -128,10 +128,12 @@ export async function balanceOf(account, tokenId) {
 
 /**
  * Verify a secondary-market sale (fixed-price Sale or accepted Offer) happened
- * on-chain for the given txHash, matching tokenId, buyer and qty. Returns
- * { ok, paid, seller, kind } on success.
+ * on-chain for the given txHash, matching tokenId and qty. `expectedParty` must
+ * be the buyer OR the seller of the event — a listing buy is recorded by the
+ * buyer, an accepted offer by the seller (the only wallet present for that tx).
+ * Returns { ok, paid, buyer, seller, kind } on success.
  */
-export async function verifySecondarySale({ txHash, expectedTokenId, expectedBuyer, expectedQty }) {
+export async function verifySecondarySale({ txHash, expectedTokenId, expectedParty, expectedQty }) {
   if (!chainConfigured || !MARKET_CONTRACT) return { ok: false, reason: "market not configured" };
   if (!/^0x[0-9a-fA-F]{64}$/.test(txHash || "")) return { ok: false, reason: "bad txHash" };
 
@@ -146,17 +148,19 @@ export async function verifySecondarySale({ txHash, expectedTokenId, expectedBuy
   const ours = receipt.logs.filter((l) => l.address.toLowerCase() === MARKET_CONTRACT.toLowerCase());
   const events = parseEventLogs({ abi: marketAbi, logs: ours });
 
+  const party = String(expectedParty).toLowerCase();
   const match = events.find(
     (e) =>
       (e.eventName === "Sale" || e.eventName === "OfferAccepted") &&
       e.args.tokenId === BigInt(expectedTokenId) &&
-      e.args.buyer.toLowerCase() === String(expectedBuyer).toLowerCase() &&
+      (e.args.buyer.toLowerCase() === party || e.args.seller.toLowerCase() === party) &&
       Number(e.args.qty) === Number(expectedQty)
   );
   if (!match) return { ok: false, reason: "no matching secondary-sale event" };
   return {
     ok: true,
     paid: match.args.paid.toString(),
+    buyer: match.args.buyer,
     seller: match.args.seller,
     kind: match.eventName === "Sale" ? "secondary_listing" : "secondary_offer",
   };

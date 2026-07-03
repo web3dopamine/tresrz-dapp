@@ -8,7 +8,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
 export type TxResult =
-  | { ok: true; hash: `0x${string}` }
+  | { ok: true; hash: `0x${string}`; warn?: string }
   | { ok: false; error: string };
 
 function errMsg(e: any): string {
@@ -113,13 +113,14 @@ export function useBuyListing() {
           value,
         });
         await publicClient?.waitForTransactionReceipt({ hash });
-        // best-effort: record to backend, swallow errors so the on-chain success stands
+        // the on-chain purchase succeeded regardless — but tell the caller if the
+        // history record failed so the UI can surface it instead of silently diverging
         try {
           await api.recordSecondarySale({ trackId, qty, txHash: hash });
+          return { ok: true, hash };
         } catch {
-          /* ignore */
+          return { ok: true, hash, warn: "Purchase confirmed on-chain, but recording it to price history failed" };
         }
-        return { ok: true, hash };
       } catch (e: any) {
         return { ok: false, error: errMsg(e) };
       } finally {
@@ -175,7 +176,7 @@ export function useAcceptOffer() {
   const [busy, setBusy] = useState(false);
 
   const accept = useCallback(
-    async (offerId: number): Promise<TxResult> => {
+    async (offerId: number, trackId: string, qty: number): Promise<TxResult> => {
       const g = guard();
       if (g) return { ok: false, error: g };
       setBusy(true);
@@ -188,7 +189,13 @@ export function useAcceptOffer() {
           args: [BigInt(offerId)],
         });
         await publicClient?.waitForTransactionReceipt({ hash });
-        return { ok: true, hash };
+        // record the sale for price history (the seller is the only wallet online here)
+        try {
+          await api.recordSecondarySale({ trackId, qty, txHash: hash });
+          return { ok: true, hash };
+        } catch {
+          return { ok: true, hash, warn: "Offer accepted on-chain, but recording it to price history failed" };
+        }
       } catch (e: any) {
         return { ok: false, error: errMsg(e) };
       } finally {
@@ -199,6 +206,38 @@ export function useAcceptOffer() {
   );
 
   return { accept, busy };
+}
+
+export function useUpdateListing() {
+  const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
+  const guard = useGuard();
+  const [busy, setBusy] = useState(false);
+
+  const update = useCallback(
+    async (listingId: number, qty: number, priceEthString: string): Promise<TxResult> => {
+      const g = guard();
+      if (g) return { ok: false, error: g };
+      setBusy(true);
+      try {
+        const hash = await writeContractAsync({
+          abi: marketAbi,
+          address: MARKET_CONTRACT,
+          functionName: "updateListing",
+          args: [BigInt(listingId), BigInt(qty), parseEther(priceEthString)],
+        });
+        await publicClient?.waitForTransactionReceipt({ hash });
+        return { ok: true, hash };
+      } catch (e: any) {
+        return { ok: false, error: errMsg(e) };
+      } finally {
+        setBusy(false);
+      }
+    },
+    [guard, writeContractAsync, publicClient],
+  );
+
+  return { update, busy };
 }
 
 export function useCancelListing() {

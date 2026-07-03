@@ -60,6 +60,27 @@ metadata pinning, preview (public) vs full (403 for non-holders, bypass for arti
 
 ---
 
+## Gap-closure pass (2026-07-03)
+
+A full audit of every interactive element against the SOW surfaced and closed
+these remaining gaps — all verified live in a headless-browser run (22/22 checks):
+
+| Fix | Where |
+|---|---|
+| Offer management UI — holders can now ACCEPT offers, buyers can CANCEL (escrow refund); open offers listed per track | `app/track/[id]/page.tsx` + `lib/useMarket.ts` |
+| Listing management UI — sellers can CANCEL and EDIT (update qty/price) their own listings | `app/track/[id]/page.tsx` |
+| Accepted offers are now recorded to price history — `/api/sales/secondary` accepts the seller as the recording party (verified against the on-chain event; tested against a real Sepolia `OfferAccepted` tx) | `backend/src/chain.js`, `backend/src/routes/sales.js` |
+| Buy-flow feedback bug — an on-chain-successful purchase whose DB record failed no longer reports "purchase failed"; a warning toast shows instead | `lib/useBuyTrack.ts`, `lib/useMarket.ts` |
+| Genre filter chips on browse (milestone 2 "filter") | `app/page.tsx` |
+| User moderation flags now enforced — flagged users vanish from `/api/artists` and their tracks from public listings | `backend/src/routes/artists.js`, `tracks.js` |
+| Dead footer links replaced; new `/about` page (about / how-it-works / royalties / contact) | `app/page.tsx`, `app/about/page.tsx` |
+| Cookie banner: "Show specifics" now shows the storage actually used; dismissal persists | `components/CookieBanner.tsx` |
+| Header nav anchors matched to their labels (DROPS→latest, ARTISTS→popular) | `components/Header.tsx` |
+| Full-track unlock now confirms visibly ("🔓 Full track unlocked…") | `components/WaveformPlayer.tsx` |
+| Next.js upgraded 14.2.5 → 14.2.35 (security patch) | `frontend/package.json` |
+| **Go-live hardening:** systemd units (`tresrz-backend`, `tresrz-frontend`, `tresrz-tunnel`) — services survive reboots; the tunnel unit re-syncs `CORS_ORIGIN`/`SIWE_DOMAIN` to the fresh quick-tunnel URL on start | `/etc/systemd/system/`, `ops/tunnel-sync.sh` |
+| RPC moved off the exhausted Alchemy key to `ethereum-sepolia-rpc.publicnode.com` | `backend/.env`, `contracts/.env` |
+
 ## What needs you (can't be done without your accounts/funds)
 1. **Mainnet deploy** — a funded, secured deployer key (real ETH gas).
 2. **Pinata (or equivalent) API key** — set `PINATA_JWT` to pin to real IPFS.

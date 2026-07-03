@@ -183,6 +183,7 @@ export default function WaveformPlayer({ track }: { track: Track }) {
       const url = resolveUrl(d.fullUrl);
       setMode("full");
       setSrc(url);
+      setGateMsg(d.viaArtist ? "🔓 Full track unlocked (you're the artist)" : "🔓 Full track unlocked — you hold an edition");
       const el = audioRef.current;
       if (el) {
         el.load();
@@ -245,7 +246,7 @@ export default function WaveformPlayer({ track }: { track: Track }) {
 
       <style jsx>{`
         .wfp {
-          background: linear-gradient(180deg, #0a1c30, #06121f);
+          background: var(--card-grad);
           border: 1px solid var(--card-line, rgba(245,132,38, 0.25));
           border-radius: 12px;
           padding: 14px 16px;

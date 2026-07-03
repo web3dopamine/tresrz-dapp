@@ -179,7 +179,7 @@ export default function MintPage() {
                 </label>
                 <label className="mint-field">
                   <span>PRICE (ETH)</span>
-                  <input type="number" min={0} step="0.001" value={price} onChange={(e) => setPrice(e.target.value)} />
+                  <input type="number" min={0} step="any" value={price} onChange={(e) => setPrice(e.target.value)} />
                 </label>
               </div>
               <label className="mint-field">
@@ -242,7 +242,7 @@ export default function MintPage() {
               <h3 className="mint-pv-title">{title || "Untitled"}</h3>
               <div className="mint-pv-meta">
                 <span>{Number(maxSupply) || 0} editions</span>
-                <span>{priceEth.toFixed(3)} ETH</span>
+                <span>{priceEth.toLocaleString(undefined, { maximumFractionDigits: 18 })} ETH</span>
                 <span>{Number(royalty) || 0}% royalty</span>
               </div>
             </div>
