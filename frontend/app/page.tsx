@@ -42,8 +42,6 @@ export default function Home() {
   const [trendWindow, setTrendWindow] = useState<TrendWindow>("1d");
   const [trendRows, setTrendRows] = useState<TrendingTrack[] | null>(null);
   const tRef = useRef<any>(null);
-  const featRef = useRef<HTMLDivElement | null>(null);
-  const featPaused = useRef(false);
   const { buy, busy } = useBuyTrack();
 
   function toast(m: string) { setMsg(m); clearTimeout(tRef.current); tRef.current = setTimeout(() => setMsg(""), 2200); }
@@ -58,35 +56,6 @@ export default function Home() {
     api.trending(trendWindow).then(setTrendRows).catch(() => setTrendRows(null));
   }, [trendWindow]);
 
-  // auto-advance the featured carousel: one card every 4s. The card set is
-  // rendered twice (loop mode), so when the scroll position passes the first
-  // copy we silently jump back one set-width — an endless belt. Targets are
-  // always exact card boundaries so scroll-snap never fights the animation.
-  // Paused while the user hovers/touches it; disabled for reduced-motion users.
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const id = setInterval(() => {
-      const el = featRef.current;
-      if (!el || featPaused.current || document.hidden) return;
-      const card = el.firstElementChild as HTMLElement | null;
-      if (!card || el.children.length < 2) return;
-      const gap = parseFloat(getComputedStyle(el).columnGap || "16") || 16;
-      const step = card.offsetWidth + gap;
-      const loop = el.dataset.loop === "true";
-      if (loop) {
-        const setW = step * (el.children.length / 2);
-        // if we've scrolled past the first copy, snap back invisibly
-        if (el.scrollLeft >= setW) el.scrollLeft -= setW;
-        const target = (Math.round(el.scrollLeft / step) + 1) * step;
-        el.scrollTo({ left: target, behavior: "smooth" });
-      } else {
-        const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - step / 2;
-        if (atEnd) el.scrollTo({ left: 0, behavior: "smooth" });
-        else el.scrollTo({ left: (Math.round(el.scrollLeft / step) + 1) * step, behavior: "smooth" });
-      }
-    }, 4000);
-    return () => clearInterval(id);
-  }, []);
 
   const q = search.toLowerCase();
   const matches = (t: Track) =>
@@ -125,20 +94,13 @@ export default function Home() {
       <Header search={search} setSearch={setSearch} />
 
       {/* ---- featured carousel ---- */}
+      {/* ---- featured: manual carousel, hover reveals details ---- */}
       <section className="me-block" id="hot">
-        <div
-          className="feat-row"
-          ref={featRef}
-          data-loop={featured.length >= 3}
-          onMouseEnter={() => { featPaused.current = true; }}
-          onMouseLeave={() => { featPaused.current = false; }}
-          onTouchStart={() => { featPaused.current = true; }}
-          onTouchEnd={() => { setTimeout(() => { featPaused.current = false; }, 5000); }}
-        >
+        <div className="feat-row">
           {featured.length === 0 ? (
             <div className="muted-note">No tracks match your search/filter.</div>
-          ) : (featured.length >= 3 ? [...featured, ...featured] : featured).map((t, i) => (
-            <Link key={`${t.id}-${i >= featured.length ? "b" : "a"}`} href={`/track/${t.id}`} className="feat-card" aria-hidden={i >= featured.length || undefined}>
+          ) : featured.map((t) => (
+            <Link key={t.id} href={`/track/${t.id}`} className="feat-card">
               <div className="feat-art"><CoverArt seed={t.coverSeed} /></div>
               <span className="feat-pill">★ FEATURED</span>
               <div className="feat-info">
@@ -148,6 +110,12 @@ export default function Home() {
                   <span>· {t.left} of {t.maxSupply} left</span>
                 </p>
                 <em>by {t.artist.handle}</em>
+                <div className="feat-more">
+                  <span>{t.genre}</span>
+                  <span>♥ {t.likes}</span>
+                  <span>{t.minted} minted</span>
+                  <i className="feat-cta">VIEW TRACK →</i>
+                </div>
               </div>
             </Link>
           ))}
@@ -163,6 +131,32 @@ export default function Home() {
           </button>
         ))}
       </div>
+
+      {/* ---- hot tracks: continuously drifting marquee ---- */}
+      <section className="me-block">
+        <div className="sec-head">
+          <div className="sec-title">HOT TRACKS</div>
+          <span className="sec-more">hover to pause</span>
+        </div>
+        {fHot.length === 0 ? (
+          <div className="muted-note">No hot tracks match your search/filter.</div>
+        ) : fHot.length >= 3 ? (
+          <div className="marquee">
+            <div className="marquee-track" style={{ ["--mq-dur" as any]: `${fHot.length * 8}s` }}>
+              <div className="mq-set">
+                {fHot.map((t) => <div className="mq-item" key={t.id}><TrackCard t={t} toast={toast} /></div>)}
+              </div>
+              <div className="mq-set" aria-hidden>
+                {fHot.map((t) => <div className="mq-item" key={`${t.id}-b`}><TrackCard t={t} toast={toast} /></div>)}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="h-row">
+            {fHot.map((t) => <TrackCard key={t.id} t={t} toast={toast} />)}
+          </div>
+        )}
+      </section>
 
       {/* ---- trending table ---- */}
       <section className="me-block">
@@ -220,19 +214,6 @@ export default function Home() {
             </Link>
           ))}
         </div>
-      </section>
-
-      {/* ---- hot tracks carousel ---- */}
-      <section className="me-block">
-        <div className="sec-head">
-          <div className="sec-title">HOT TRACKS</div>
-          <span className="sec-more">scroll →</span>
-        </div>
-        {fHot.length === 0 ? <div className="muted-note">No hot tracks match your search/filter.</div> : (
-          <div className="h-row">
-            {fHot.map((t) => <TrackCard key={t.id} t={t} toast={toast} />)}
-          </div>
-        )}
       </section>
 
       {/* ---- latest drops carousel ---- */}

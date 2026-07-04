@@ -329,6 +329,26 @@ a.sec-more:hover{text-decoration:underline}
 [data-theme="light"] .feat-info{background:linear-gradient(0deg,#fff 25%,rgba(255,255,255,0))}
 [data-theme="light"] .feat-info h3{color:var(--navy)}
 [data-theme="light"] .feat-info p{color:var(--navy)}
+/* hover: cover zooms and a detail strip slides open under the title */
+.feat-art{transition:transform .45s ease}
+.feat-card:hover .feat-art{transform:scale(1.05)}
+.feat-more{display:flex;align-items:center;gap:6px;max-height:0;opacity:0;overflow:hidden;transition:max-height .3s ease,opacity .3s ease,margin-top .3s ease;margin-top:0}
+.feat-card:hover .feat-more,.feat-card:focus-visible .feat-more{max-height:44px;opacity:1;margin-top:10px}
+.feat-more span{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.5px;border:1px solid var(--card-line);border-radius:14px;padding:4px 9px;color:var(--muted);white-space:nowrap}
+.feat-more .feat-cta{margin-left:auto;font-style:normal;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:1px;color:#fff;background:linear-gradient(135deg,var(--crimson),var(--magenta));border-radius:14px;padding:5px 11px;white-space:nowrap}
+[data-theme="light"] .feat-more span{border:1.5px solid var(--navy);color:var(--navy)}
+[data-theme="light"] .feat-more .feat-cta{background:var(--crimson);color:var(--navy);border:1.5px solid var(--navy)}
+@media(hover:none){.feat-more{max-height:44px;opacity:1;margin-top:10px}} /* touch devices: always show */
+
+/* --- continuous marquee row (hot tracks) --- */
+.marquee{overflow:hidden;padding:4px 2px 14px}
+.marquee-track{display:flex;width:max-content;animation:mq-slide var(--mq-dur,40s) linear infinite}
+.marquee:hover .marquee-track{animation-play-state:paused}
+.mq-set{display:flex;gap:16px;padding-right:16px}
+.mq-item{flex:0 0 225px;min-width:0}
+@keyframes mq-slide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media(prefers-reduced-motion:reduce){.marquee-track{animation:none}}
+@media(max-width:900px){.mq-item{flex-basis:195px}}
 
 /* --- horizontal card rows --- */
 .h-row{display:grid;grid-auto-flow:column;grid-auto-columns:225px;gap:16px;overflow-x:auto;padding:4px 2px 14px;scroll-snap-type:x proximity;scrollbar-width:thin}
