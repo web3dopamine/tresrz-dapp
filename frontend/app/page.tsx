@@ -42,6 +42,8 @@ export default function Home() {
   const [trendWindow, setTrendWindow] = useState<TrendWindow>("1d");
   const [trendRows, setTrendRows] = useState<TrendingTrack[] | null>(null);
   const tRef = useRef<any>(null);
+  const featRef = useRef<HTMLDivElement | null>(null);
+  const featPaused = useRef(false);
   const { buy, busy } = useBuyTrack();
 
   function toast(m: string) { setMsg(m); clearTimeout(tRef.current); tRef.current = setTimeout(() => setMsg(""), 2200); }
@@ -55,6 +57,36 @@ export default function Home() {
   useEffect(() => {
     api.trending(trendWindow).then(setTrendRows).catch(() => setTrendRows(null));
   }, [trendWindow]);
+
+  // auto-advance the featured carousel: one card every 4s. The card set is
+  // rendered twice (loop mode), so when the scroll position passes the first
+  // copy we silently jump back one set-width — an endless belt. Targets are
+  // always exact card boundaries so scroll-snap never fights the animation.
+  // Paused while the user hovers/touches it; disabled for reduced-motion users.
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const id = setInterval(() => {
+      const el = featRef.current;
+      if (!el || featPaused.current || document.hidden) return;
+      const card = el.firstElementChild as HTMLElement | null;
+      if (!card || el.children.length < 2) return;
+      const gap = parseFloat(getComputedStyle(el).columnGap || "16") || 16;
+      const step = card.offsetWidth + gap;
+      const loop = el.dataset.loop === "true";
+      if (loop) {
+        const setW = step * (el.children.length / 2);
+        // if we've scrolled past the first copy, snap back invisibly
+        if (el.scrollLeft >= setW) el.scrollLeft -= setW;
+        const target = (Math.round(el.scrollLeft / step) + 1) * step;
+        el.scrollTo({ left: target, behavior: "smooth" });
+      } else {
+        const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - step / 2;
+        if (atEnd) el.scrollTo({ left: 0, behavior: "smooth" });
+        else el.scrollTo({ left: (Math.round(el.scrollLeft / step) + 1) * step, behavior: "smooth" });
+      }
+    }, 4000);
+    return () => clearInterval(id);
+  }, []);
 
   const q = search.toLowerCase();
   const matches = (t: Track) =>
@@ -94,11 +126,19 @@ export default function Home() {
 
       {/* ---- featured carousel ---- */}
       <section className="me-block" id="hot">
-        <div className="feat-row">
+        <div
+          className="feat-row"
+          ref={featRef}
+          data-loop={featured.length >= 3}
+          onMouseEnter={() => { featPaused.current = true; }}
+          onMouseLeave={() => { featPaused.current = false; }}
+          onTouchStart={() => { featPaused.current = true; }}
+          onTouchEnd={() => { setTimeout(() => { featPaused.current = false; }, 5000); }}
+        >
           {featured.length === 0 ? (
             <div className="muted-note">No tracks match your search/filter.</div>
-          ) : featured.map((t) => (
-            <Link key={t.id} href={`/track/${t.id}`} className="feat-card">
+          ) : (featured.length >= 3 ? [...featured, ...featured] : featured).map((t, i) => (
+            <Link key={`${t.id}-${i >= featured.length ? "b" : "a"}`} href={`/track/${t.id}`} className="feat-card" aria-hidden={i >= featured.length || undefined}>
               <div className="feat-art"><CoverArt seed={t.coverSeed} /></div>
               <span className="feat-pill">★ FEATURED</span>
               <div className="feat-info">
