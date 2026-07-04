@@ -301,3 +301,79 @@ footer{margin-top:30px;border-top:1px solid var(--card-line);padding:40px 34px 6
 /* --- cookie banner specifics --- */
 .cookie .cookie-specifics{width:100%;margin-top:10px;font-size:11px;color:var(--muted);line-height:1.7}
 .cookie .cookie-specifics ul{margin:6px 0 0;padding-left:18px}
+
+/* ============================================================
+   MAGIC-EDEN STYLE LAYOUT (structure only — colors untouched,
+   everything derives from the existing theme variables)
+   ============================================================ */
+.me-block{padding:22px 34px 6px}
+.sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:14px;margin-bottom:16px}
+.sec-more{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--crimson-soft);text-decoration:none;letter-spacing:1px;white-space:nowrap}
+a.sec-more:hover{text-decoration:underline}
+
+/* --- featured hero carousel --- */
+.feat-row{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(280px,330px);gap:16px;overflow-x:auto;padding:4px 2px 12px;scroll-snap-type:x proximity;scrollbar-width:thin}
+.feat-card{position:relative;height:300px;border-radius:16px;overflow:hidden;border:1px solid var(--card-line);scroll-snap-align:start;display:block;text-decoration:none;transition:.25s;background:var(--card-grad)}
+.feat-card:hover{transform:translateY(-4px);border-color:var(--crimson);box-shadow:0 14px 34px rgba(0,0,0,.4)}
+.feat-art{position:absolute;inset:0}
+.feat-art svg,.feat-art>*{width:100%;height:100%;object-fit:cover}
+.feat-pill{position:absolute;top:12px;left:12px;z-index:2;background:var(--overlay);border:1px solid var(--card-line);color:var(--ink);font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:1px;padding:5px 11px;border-radius:20px}
+.feat-info{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:38px 16px 14px;background:linear-gradient(0deg,var(--overlay) 30%,transparent)}
+.feat-info h3{color:var(--ink);font-size:17px;font-weight:700;letter-spacing:.5px;margin:0 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.feat-info p{margin:0;font-family:var(--mono);font-size:12px;color:var(--ink);display:flex;gap:6px;align-items:baseline}
+.feat-info p span{color:var(--muted);font-size:11px}
+.feat-info em{display:block;font-style:normal;font-size:11px;color:var(--crimson-soft);margin-top:3px}
+[data-theme="light"] .feat-card{border:2.5px solid var(--navy);box-shadow:5px 5px 0 var(--navy)}
+[data-theme="light"] .feat-card:hover{transform:translate(-2px,-2px);box-shadow:9px 9px 0 var(--crimson)}
+[data-theme="light"] .feat-pill{background:#fff;border:2px solid var(--navy);color:var(--navy)}
+[data-theme="light"] .feat-info{background:linear-gradient(0deg,#fff 25%,rgba(255,255,255,0))}
+[data-theme="light"] .feat-info h3{color:var(--navy)}
+[data-theme="light"] .feat-info p{color:var(--navy)}
+
+/* --- horizontal card rows --- */
+.h-row{display:grid;grid-auto-flow:column;grid-auto-columns:225px;gap:16px;overflow-x:auto;padding:4px 2px 14px;scroll-snap-type:x proximity;scrollbar-width:thin}
+.h-row>*{min-width:0;scroll-snap-align:start}
+.h-row-artists{grid-auto-columns:250px}
+
+/* --- trending table --- */
+.trend-table{display:flex;flex-direction:column}
+.trend-tr{display:grid;grid-template-columns:30px minmax(0,1fr) 110px 90px 76px 96px;align-items:center;gap:12px;padding:9px 12px;border-radius:10px;text-decoration:none;border-bottom:1px solid var(--line-soft);transition:.15s}
+a.trend-tr:hover{background:var(--panel-bg)}
+.trend-th{border-bottom:1px solid var(--line);padding-bottom:6px;font-family:var(--mono);font-size:10px;letter-spacing:1.5px;color:var(--muted)}
+.tt-rank{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--muted)}
+.tt-track{display:flex;align-items:center;gap:11px;min-width:0}
+.tt-cover{width:42px;height:42px;border-radius:8px;overflow:hidden;flex-shrink:0;border:1px solid var(--card-line)}
+.tt-cover svg,.tt-cover>*{width:100%;height:100%}
+.tt-name{display:flex;flex-direction:column;min-width:0}
+.tt-name b{color:var(--ink);font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tt-name small{color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tt-num{font-family:var(--mono);font-size:13px;color:var(--ink);text-align:right;white-space:nowrap}
+.tt-num small{color:var(--muted);font-size:10px}
+.tt-likes{color:var(--crimson-soft)}
+.tt-buy{text-align:right}
+.tt-mini{width:auto;padding:8px 16px;font-size:11px;margin-top:0}
+[data-theme="light"] a.trend-tr:hover{background:#fff;box-shadow:3px 3px 0 var(--navy)}
+[data-theme="light"] .tt-cover{border:2px solid var(--navy)}
+
+/* --- header: magic-eden proportions (wide rounded search) --- */
+.search{flex:1 1 auto;max-width:520px}
+.search input{border-radius:22px;padding:10px 18px}
+[data-theme="light"] .search input{border-radius:22px}
+nav{margin-left:0}
+.lang{margin-left:0}
+
+@media(max-width:900px){
+  .feat-row{grid-auto-columns:minmax(240px,78vw)}
+  .feat-card{height:250px}
+  .h-row{grid-auto-columns:195px}
+  .h-row-artists{grid-auto-columns:230px}
+}
+@media(max-width:760px){
+  .me-block{padding:18px 16px 4px}
+  .trend-tr{grid-template-columns:22px minmax(0,1fr) 92px 74px}
+  .tt-left,.tt-likes{display:none}
+  .tt-buy .tt-mini{padding:8px 12px}
+}
+@media(max-width:420px){
+  .trend-tr{grid-template-columns:20px minmax(0,1fr) 84px 66px;gap:8px;padding:8px 6px}
+}

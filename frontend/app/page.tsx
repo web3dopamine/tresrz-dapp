@@ -6,7 +6,10 @@ import TrackCard from "@/components/TrackCard";
 import ArtistCard from "@/components/ArtistCard";
 import DropCard from "@/components/DropCard";
 import CookieBanner from "@/components/CookieBanner";
+import { CoverArt, avatarUrl } from "@/lib/art";
 import { api, type Track, type Artist } from "@/lib/api";
+import { useBuyTrack } from "@/lib/useBuyTrack";
+import { formatEther } from "viem";
 
 // Fallback demo data so the UI renders even before the backend/seed is up
 const DEMO_TRACKS: Track[] = [
@@ -25,6 +28,10 @@ const DEMO_ARTISTS: Artist[] = [
   ["matlemad", 9, 14], ["Flower of Sound", 1, 5], ["Lego Flowers", 5, 10], ["Jaidem", 1, 8], ["Cappadonia", 1, 5],
 ].map(([h, n, l], i) => ({ id: `ar${i}`, handle: h as string, address: "0x0", avatarSeed: i * 137 + 3, nftCount: n as number, likes: l as number }));
 
+function eth(wei: string, dp = 2): string {
+  try { return Number(formatEther(BigInt(wei))).toFixed(dp); } catch { return "0"; }
+}
+
 export default function Home() {
   const [hot, setHot] = useState<Track[]>(DEMO_TRACKS);
   const [latest, setLatest] = useState<Track[]>(DEMO_LATEST);
@@ -33,12 +40,13 @@ export default function Home() {
   const [genre, setGenre] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
   const tRef = useRef<any>(null);
+  const { buy, busy } = useBuyTrack();
 
   function toast(m: string) { setMsg(m); clearTimeout(tRef.current); tRef.current = setTimeout(() => setMsg(""), 2200); }
 
   useEffect(() => {
     api.tracks("?hot=true").then((d) => d.length && setHot(d)).catch(() => {});
-    api.tracks("?limit=5").then((d) => d.length && setLatest(d)).catch(() => {});
+    api.tracks("?limit=12").then((d) => d.length && setLatest(d)).catch(() => {});
     api.artists().then((d) => d.length && setArtists(d)).catch(() => {});
   }, []);
 
@@ -53,16 +61,51 @@ export default function Home() {
     [hot, latest],
   );
 
+  // featured carousel = hot tracks; trending = all unique tracks by likes
+  const featured = fHot.slice(0, 8);
+  const trending = useMemo(() => {
+    const seen = new Set<string>();
+    return [...hot, ...latest]
+      .filter((t) => (seen.has(t.id) ? false : (seen.add(t.id), true)))
+      .filter(matches)
+      .sort((a, b) => b.likes - a.likes || b.minted - a.minted)
+      .slice(0, 10);
+  }, [hot, latest, q, genre]);
+
+  async function onQuickBuy(t: Track) {
+    const res = await buy(t);
+    if (!res.ok) return toast(res.error);
+    toast(res.warn ? `⚠ ${res.warn}` : `Bought ${t.title} ✓`);
+    api.tracks("?hot=true").then((d) => d.length && setHot(d)).catch(() => {});
+  }
+
   return (
     <div className="wrap">
       <Header search={search} setSearch={setSearch} />
 
-      <div className="hero">
-        <h1>EXPLORE</h1>
-        <p>Own the sound · Mint · Collect · Stream</p>
-        <div className="hero-rule" />
-      </div>
+      {/* ---- featured carousel ---- */}
+      <section className="me-block" id="hot">
+        <div className="feat-row">
+          {featured.length === 0 ? (
+            <div className="muted-note">No tracks match your search/filter.</div>
+          ) : featured.map((t) => (
+            <Link key={t.id} href={`/track/${t.id}`} className="feat-card">
+              <div className="feat-art"><CoverArt seed={t.coverSeed} /></div>
+              <span className="feat-pill">★ FEATURED</span>
+              <div className="feat-info">
+                <h3>{t.title}</h3>
+                <p>
+                  <b>{eth(t.priceWei)} ETH</b>
+                  <span>· {t.left} of {t.maxSupply} left</span>
+                </p>
+                <em>by {t.artist.handle}</em>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
 
+      {/* ---- genre pills ---- */}
       <div className="genre-filter" id="genres">
         <button className={`genre-chip${genre === null ? " active" : ""}`} onClick={() => setGenre(null)}>ALL</button>
         {genres.map((g) => (
@@ -72,28 +115,79 @@ export default function Home() {
         ))}
       </div>
 
-      <section className="block" id="hot">
-        <div className="hot-row">
-          <div className="hot-label"><span>HOT TRACKS</span></div>
-          <div className="hot-cards">
-            {fHot.length === 0 ? <div className="muted-note">No hot tracks match your search/filter.</div>
-              : fHot.map((t) => <TrackCard key={t.id} t={t} toast={toast} />)}
+      {/* ---- trending table ---- */}
+      <section className="me-block">
+        <div className="sec-head">
+          <div className="sec-title">TRENDING</div>
+          <Link className="sec-more" href="#latest">See all →</Link>
+        </div>
+        <div className="trend-table">
+          <div className="trend-tr trend-th">
+            <span>#</span><span>TRACK</span><span className="tt-num">PRICE</span>
+            <span className="tt-num tt-left">LEFT</span><span className="tt-num tt-likes">LIKES</span><span />
           </div>
+          {trending.length === 0 ? (
+            <div className="muted-note">No tracks match your search/filter.</div>
+          ) : trending.map((t, i) => (
+            <Link key={t.id} href={`/track/${t.id}`} className="trend-tr">
+              <span className="tt-rank">{i + 1}</span>
+              <span className="tt-track">
+                <span className="tt-cover"><CoverArt seed={t.coverSeed} /></span>
+                <span className="tt-name">
+                  <b>{t.title}</b>
+                  <small>{t.artist.handle} · {t.genre}</small>
+                </span>
+              </span>
+              <span className="tt-num"><b>{eth(t.priceWei, 3)}</b> <small>ETH</small></span>
+              <span className="tt-num tt-left">{t.left} / {t.maxSupply}</span>
+              <span className="tt-num tt-likes">♥ {t.likes}</span>
+              <span className="tt-buy">
+                <button
+                  className="buy tt-mini"
+                  disabled={busy || t.left === 0}
+                  onClick={(e) => { e.preventDefault(); onQuickBuy(t); }}
+                >
+                  {t.left === 0 ? "SOLD OUT" : busy ? "…" : "BUY"}
+                </button>
+              </span>
+            </Link>
+          ))}
         </div>
       </section>
 
-      <section className="block" id="popular">
-        <div className="sec-title">POPULAR ARTISTS</div>
-        <div className="sec-bar" />
-        <div className="pop-grid">{fArtists.map((a) => <ArtistCard key={a.id} a={a} />)}</div>
+      {/* ---- hot tracks carousel ---- */}
+      <section className="me-block">
+        <div className="sec-head">
+          <div className="sec-title">HOT TRACKS</div>
+          <span className="sec-more">scroll →</span>
+        </div>
+        {fHot.length === 0 ? <div className="muted-note">No hot tracks match your search/filter.</div> : (
+          <div className="h-row">
+            {fHot.map((t) => <TrackCard key={t.id} t={t} toast={toast} />)}
+          </div>
+        )}
       </section>
 
-      <section className="block" id="latest">
-        <div className="sec-title">LATEST DROPS</div>
-        <div className="sec-bar" />
-        <div className="latest-grid">
-          {fLatest.length === 0 ? <div className="muted-note">No drops match your search/filter.</div>
-            : fLatest.map((t) => <DropCard key={t.id} t={t} />)}
+      {/* ---- latest drops carousel ---- */}
+      <section className="me-block" id="latest">
+        <div className="sec-head">
+          <div className="sec-title">LATEST DROPS</div>
+          <Link className="sec-more" href="/mint">Mint yours →</Link>
+        </div>
+        {fLatest.length === 0 ? <div className="muted-note">No drops match your search/filter.</div> : (
+          <div className="h-row">
+            {fLatest.map((t) => <DropCard key={t.id} t={t} />)}
+          </div>
+        )}
+      </section>
+
+      {/* ---- popular artists ---- */}
+      <section className="me-block" id="popular">
+        <div className="sec-head">
+          <div className="sec-title">POPULAR ARTISTS</div>
+        </div>
+        <div className="h-row h-row-artists">
+          {fArtists.map((a) => <ArtistCard key={a.id} a={a} />)}
         </div>
       </section>
 
