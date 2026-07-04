@@ -1,7 +1,7 @@
 import { Router } from "express";
 import Stripe from "stripe";
 import { prisma } from "../db.js";
-import { requireAuth } from "../middleware/auth.js";
+import { optionalAuth } from "../middleware/auth.js";
 import { buyAndDeliver, deliveryConfigured } from "../chain.js";
 import { usdPerEth } from "./rate.js";
 
@@ -21,13 +21,17 @@ const r = Router();
 
 r.get("/status", (_req, res) => res.json({ enabled: fiatEnabled() }));
 
-// POST /api/fiat/checkout { trackId, qty } -> { url } (Stripe-hosted checkout)
-r.post("/checkout", requireAuth, async (req, res) => {
+// POST /api/fiat/checkout { trackId, qty, deliveryAddress? } -> { url }
+// Card buyers don't need a connected wallet or SIWE session — they only need
+// a delivery address. Signed-in users default to their own wallet.
+r.post("/checkout", optionalAuth, async (req, res) => {
   if (!fiatEnabled()) return res.status(503).json({ error: "card payments not configured" });
-  const { trackId, qty } = req.body || {};
+  const { trackId, qty, deliveryAddress } = req.body || {};
   const q = Number(qty) || 1;
   if (typeof trackId !== "string" || !trackId) return res.status(400).json({ error: "trackId required" });
   if (!Number.isInteger(q) || q < 1 || q > 100) return res.status(400).json({ error: "qty must be 1..100" });
+  const to = String(deliveryAddress || req.user?.address || "");
+  if (!/^0x[0-9a-fA-F]{40}$/.test(to)) return res.status(400).json({ error: "valid delivery wallet address required" });
 
   const track = await prisma.track.findUnique({ where: { id: trackId }, include: { artist: true } });
   if (!track) return res.status(404).json({ error: "track not found" });
@@ -51,14 +55,14 @@ r.post("/checkout", requireAuth, async (req, res) => {
           unit_amount: centsEach,
           product_data: {
             name: `${track.title} — limited edition`,
-            description: `Music NFT by ${track.artist.handle || track.artist.address.slice(0, 8)} · delivered on-chain to ${req.user.address}`,
+            description: `Music NFT by ${track.artist.handle || track.artist.address.slice(0, 8)} · delivered on-chain to ${to}`,
           },
         },
       }],
       metadata: {
         trackId: track.id,
         chainTokenId: String(track.chainTokenId),
-        buyer: req.user.address,
+        buyer: to,
         qty: String(q),
         unitPriceWei: track.priceWei,
       },

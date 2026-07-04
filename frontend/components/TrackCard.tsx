@@ -5,13 +5,13 @@ import { useRouter } from "next/navigation";
 import { CoverArt, avatarUrl } from "@/lib/art";
 import { api, type Track } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { useBuyTrack } from "@/lib/useBuyTrack";
 import { useUsdRate, usd } from "@/lib/usd";
+import BuyModal from "@/components/BuyModal";
 
 export default function TrackCard({ t, toast }: { t: Track; toast: (m: string) => void }) {
   const router = useRouter();
   const { token } = useAuth();
-  const { buy, busy } = useBuyTrack();
+  const [buyOpen, setBuyOpen] = useState(false);
 
   const [left, setLeft] = useState(t.left);
   const [liked, setLiked] = useState(t.liked);
@@ -33,10 +33,7 @@ export default function TrackCard({ t, toast }: { t: Track; toast: (m: string) =
     else { el.pause(); setPlaying(false); }
   }
 
-  async function onBuy() {
-    const res = await buy(t);
-    if (!res.ok) return toast(res.error);
-    toast(`Bought ${t.title} ✓`);
+  function onBought() {
     setLeft((l) => Math.max(0, l - 1)); // optimistic
     api.track(t.id).then((fresh) => setLeft(fresh.left)).catch(() => {}); // reconcile
   }
@@ -82,7 +79,8 @@ export default function TrackCard({ t, toast }: { t: Track; toast: (m: string) =
           <small>{likes}</small>
         </button>
       </div>
-      <button className="buy" disabled={busy || left === 0} onClick={onBuy}>{left === 0 ? "SOLD OUT" : busy ? "CONFIRMING…" : "BUY NOW"}</button>
+      <button className="buy" disabled={left === 0} onClick={() => setBuyOpen(true)}>{left === 0 ? "SOLD OUT" : "BUY NOW"}</button>
+      <BuyModal track={{ ...t, left }} open={buyOpen} onClose={() => setBuyOpen(false)} toast={toast} onBought={onBought} />
     </div>
   );
 }

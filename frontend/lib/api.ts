@@ -82,7 +82,7 @@ export const api = {
   // USD pricing + Stripe card checkout
   rate: (): Promise<{ usdPerEth: number; at: number }> => req(`/api/rate`),
   fiatStatus: (): Promise<{ enabled: boolean }> => req(`/api/fiat/status`),
-  fiatCheckout: (b: { trackId: string; qty: number }): Promise<{ url: string }> =>
+  fiatCheckout: (b: { trackId: string; qty: number; deliveryAddress?: string }): Promise<{ url: string }> =>
     req(`/api/fiat/checkout`, { method: "POST", body: JSON.stringify(b) }),
 
   // M4: admin

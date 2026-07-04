@@ -6,9 +6,9 @@ import TrackCard from "@/components/TrackCard";
 import ArtistCard from "@/components/ArtistCard";
 import DropCard from "@/components/DropCard";
 import CookieBanner from "@/components/CookieBanner";
+import BuyModal from "@/components/BuyModal";
 import { CoverArt, avatarUrl } from "@/lib/art";
 import { api, type Track, type Artist, type TrendingTrack, type TrendWindow } from "@/lib/api";
-import { useBuyTrack } from "@/lib/useBuyTrack";
 import { useUsdRate, usd } from "@/lib/usd";
 import { formatEther } from "viem";
 
@@ -43,8 +43,8 @@ export default function Home() {
   const [trendWindow, setTrendWindow] = useState<TrendWindow>("1d");
   const [trendRows, setTrendRows] = useState<TrendingTrack[] | null>(null);
   const tRef = useRef<any>(null);
-  const { buy, busy } = useBuyTrack();
   const rate = useUsdRate();
+  const [buyTrack, setBuyTrack] = useState<Track | null>(null);
 
   function toast(m: string) { setMsg(m); clearTimeout(tRef.current); tRef.current = setTimeout(() => setMsg(""), 2200); }
 
@@ -83,10 +83,7 @@ export default function Home() {
       .slice(0, 10);
   }, [trendRows, hot, latest, q, genre]);
 
-  async function onQuickBuy(t: Track) {
-    const res = await buy(t);
-    if (!res.ok) return toast(res.error);
-    toast(res.warn ? `⚠ ${res.warn}` : `Bought ${t.title} ✓`);
+  function onBought() {
     api.tracks("?hot=true").then((d) => d.length && setHot(d)).catch(() => {});
     api.trending(trendWindow).then(setTrendRows).catch(() => {});
   }
@@ -210,10 +207,10 @@ export default function Home() {
               <span className="tt-buy">
                 <button
                   className="buy tt-mini"
-                  disabled={busy || t.left === 0}
-                  onClick={(e) => { e.preventDefault(); onQuickBuy(t); }}
+                  disabled={t.left === 0}
+                  onClick={(e) => { e.preventDefault(); setBuyTrack(t); }}
                 >
-                  {t.left === 0 ? "SOLD OUT" : busy ? "…" : "BUY"}
+                  {t.left === 0 ? "SOLD OUT" : "BUY"}
                 </button>
               </span>
             </Link>
@@ -258,6 +255,7 @@ export default function Home() {
       </footer>
 
       <CookieBanner />
+      <BuyModal track={buyTrack} open={!!buyTrack} onClose={() => setBuyTrack(null)} toast={toast} onBought={onBought} />
       <div className={`toast${msg ? " show" : ""}`}>{msg}</div>
     </div>
   );

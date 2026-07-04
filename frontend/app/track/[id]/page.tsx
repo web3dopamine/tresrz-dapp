@@ -6,6 +6,7 @@ import { formatEther } from "viem";
 import { useAccount, useReadContract, useReadContracts } from "wagmi";
 import Header from "@/components/Header";
 import WaveformPlayer from "@/components/WaveformPlayer";
+import BuyModal from "@/components/BuyModal";
 import { CoverArt, avatarUrl } from "@/lib/art";
 import { api, type Track, type SaleHistory } from "@/lib/api";
 import { musicAbi, MUSIC_CONTRACT } from "@/lib/abi";
@@ -21,7 +22,6 @@ const EXPLORER =
   : "https://explorer.libertychain.org";
 const EXPLORER_NAME = CHAIN_ID === 11155111 ? "Sepolia Etherscan" : CHAIN_ID === 1 ? "Etherscan" : "the explorer";
 const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
-import { useBuyTrack } from "@/lib/useBuyTrack";
 import {
   useAcceptOffer,
   useBuyListing,
@@ -67,7 +67,6 @@ export default function TrackPage() {
   const { id } = useParams<{ id: string }>();
   const { token } = useAuth();
   const { address } = useAccount();
-  const { buy, busy } = useBuyTrack();
 
   const { buy: buyListing, busy: buyingListing } = useBuyListing();
   const { list, busy: listing } = useListTrack();
@@ -97,12 +96,9 @@ export default function TrackPage() {
   // opensea-style layout state: right-column tab + inline make-offer form
   const [tab, setTab] = useState<"details" | "orders" | "activity">("details");
   const [showOffer, setShowOffer] = useState(false);
-  // USD pricing + Stripe card checkout
+  // USD pricing + buy modal (card / crypto chooser)
   const rate = useUsdRate();
-  const [fiatEnabled, setFiatEnabled] = useState(false);
-  const [cardBusy, setCardBusy] = useState(false);
-
-  useEffect(() => { api.fiatStatus().then((d) => setFiatEnabled(d.enabled)).catch(() => {}); }, []);
+  const [buyOpen, setBuyOpen] = useState(false);
 
   // returning from Stripe checkout: surface the outcome, then refresh once the
   // on-chain delivery (2 txs) has had time to land
@@ -119,20 +115,6 @@ export default function TrackPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  async function onBuyCard() {
-    if (!track) return;
-    if (!token) return toast("Sign in with your wallet first — the editions are delivered to it");
-    setCardBusy(true);
-    try {
-      const { url } = await api.fiatCheckout({ trackId: track.id, qty: 1 });
-      window.location.href = url;
-    } catch (e: any) {
-      toast(e?.message || "Could not start card checkout");
-    } finally {
-      setCardBusy(false);
-    }
-  }
 
   function toast(m: string) { setMsg(m); clearTimeout(tRef.current); tRef.current = setTimeout(() => setMsg(""), 2400); }
 
@@ -238,14 +220,6 @@ export default function TrackPage() {
     refetchOffers();
     refetchBalance();
     load();
-  }
-
-  async function onBuy() {
-    if (!track) return;
-    const res = await buy(track);
-    if (!res.ok) return toast(res.error);
-    toast(res.warn ? `⚠ ${res.warn}` : `Bought ${track.title} ✓`);
-    api.track(id).then((t) => setTrack(t)).catch(() => {});
   }
 
   async function onBuyListing(l: Listing) {
@@ -394,14 +368,9 @@ export default function TrackPage() {
                   <div className="os-price">{priceEth.toFixed(3)} <small>ETH</small></div>
                 )}
                 <div className="os-buy-actions">
-                  <button className="buy os-buynow" disabled={busy || track.left === 0} onClick={onBuy}>
-                    {track.left === 0 ? "SOLD OUT" : busy ? "CONFIRMING…" : "BUY NOW"}
+                  <button className="buy os-buynow" disabled={track.left === 0} onClick={() => setBuyOpen(true)}>
+                    {track.left === 0 ? "SOLD OUT" : "BUY NOW"}
                   </button>
-                  {fiatEnabled && track.left > 0 && (
-                    <button className="os-makeoffer os-card" disabled={cardBusy} onClick={onBuyCard} title="Pay in USD with a card — editions are delivered to your wallet">
-                      {cardBusy ? "…" : "💳 BUY WITH CARD"}
-                    </button>
-                  )}
                   <button
                     className="os-makeoffer"
                     disabled={chainTokenId == null}
@@ -614,6 +583,13 @@ export default function TrackPage() {
           </div>
         )}
       </section>
+      <BuyModal
+        track={track}
+        open={buyOpen}
+        onClose={() => setBuyOpen(false)}
+        toast={toast}
+        onBought={() => { refreshChain(); }}
+      />
       <div className={`toast${msg ? " show" : ""}`}>{msg}</div>
 
       <style jsx>{`
