@@ -34,7 +34,7 @@ export default function Header({ search, setSearch }: { search?: string; setSear
       )}
       <nav>
         <Link href="/#hot">MARKETPLACE</Link>
-        <Link href="/#latest">DROPS</Link>
+        <Link href="/#latest">SUGGESTED</Link>
         <Link href="/#popular">ARTISTS</Link>
         <Link href="/mint">MINT</Link>
         <Link href="/collection">COLLECTION</Link>
@@ -56,7 +56,7 @@ export default function Header({ search, setSearch }: { search?: string; setSear
       {menuOpen && (
         <div className="mobile-menu" onClick={() => setMenuOpen(false)}>
           <Link href="/#hot">MARKETPLACE</Link>
-          <Link href="/#latest">DROPS</Link>
+          <Link href="/#latest">SUGGESTED</Link>
           <Link href="/#popular">ARTISTS</Link>
           <Link href="/mint">MINT</Link>
           <Link href="/collection">COLLECTION</Link>

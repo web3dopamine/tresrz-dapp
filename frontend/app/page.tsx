@@ -216,13 +216,13 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ---- latest drops carousel ---- */}
+      {/* ---- suggested carousel ---- */}
       <section className="me-block" id="latest">
         <div className="sec-head">
-          <div className="sec-title">LATEST DROPS</div>
+          <div className="sec-title">SUGGESTED</div>
           <Link className="sec-more" href="/mint">Mint yours →</Link>
         </div>
-        {fLatest.length === 0 ? <div className="muted-note">No drops match your search/filter.</div> : (
+        {fLatest.length === 0 ? <div className="muted-note">No tracks match your search/filter.</div> : (
           <div className="h-row">
             {fLatest.map((t) => <DropCard key={t.id} t={t} />)}
           </div>
@@ -245,7 +245,7 @@ export default function Home() {
             <div className="logo"><div className="bars"><span /><span /><span /><span /></div><b>TRES<span>RZ</span></b></div>
             <p>The marketplace where music becomes property. Mint your masters, sell limited editions, and let fans truly own the sound.</p>
           </div>
-          <div className="foot-col"><h5>MARKET</h5><a href="#hot">Explore</a><a href="#latest">Latest drops</a><a href="#popular">Top artists</a><a href="#genres">Genres</a></div>
+          <div className="foot-col"><h5>MARKET</h5><a href="#hot">Explore</a><a href="#latest">Suggested</a><a href="#popular">Top artists</a><a href="#genres">Genres</a></div>
           <div className="foot-col"><h5>CREATE</h5><Link href="/mint">Mint a track</Link><Link href="/about#royalties">Royalties</Link><Link href="/about#docs">How it works</Link><Link href="/collection">Your collection</Link></div>
           <div className="foot-col"><h5>COMPANY</h5><Link href="/about">About</Link><Link href="/about#contact">Contact</Link><Link href="/about#docs">Docs</Link></div>
         </div>
