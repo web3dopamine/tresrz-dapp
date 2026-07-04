@@ -1,4 +1,5 @@
-import { createPublicClient, http, parseEventLogs, defineChain } from "viem";
+import { createPublicClient, createWalletClient, http, parseEventLogs, defineChain } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 
 // Minimal ABI for reading the primary-sale event we verify against.
 export const purchaseAbi = [
@@ -75,6 +76,53 @@ const chain = defineChain({
 export const publicClient = RPC_URL && MUSIC_CONTRACT ? createPublicClient({ chain, transport: http(RPC_URL) }) : null;
 
 export const chainConfigured = !!publicClient;
+
+// ---- fiat delivery wallet (Stripe checkout fulfilment) ----
+// The platform wallet that buys editions on-chain after a card payment clears
+// and forwards them to the customer. Testnet: the deployer key works fine.
+const DELIVERY_PK = process.env.DELIVERY_PRIVATE_KEY || null;
+const deliveryAccount = DELIVERY_PK && /^0x[0-9a-fA-F]{64}$/.test(DELIVERY_PK) ? privateKeyToAccount(DELIVERY_PK) : null;
+const deliveryWallet = deliveryAccount && RPC_URL ? createWalletClient({ account: deliveryAccount, chain, transport: http(RPC_URL) }) : null;
+export const deliveryConfigured = !!(deliveryWallet && publicClient && MUSIC_CONTRACT);
+export const deliveryAddress = deliveryAccount?.address ?? null;
+
+const musicWriteAbi = [
+  { type: "function", name: "buy", stateMutability: "payable", inputs: [{ name: "trackId", type: "uint256" }, { name: "qty", type: "uint64" }], outputs: [] },
+  { type: "function", name: "safeTransferFrom", stateMutability: "nonpayable", inputs: [
+    { name: "from", type: "address" }, { name: "to", type: "address" },
+    { name: "id", type: "uint256" }, { name: "amount", type: "uint256" }, { name: "data", type: "bytes" },
+  ], outputs: [] },
+];
+
+/**
+ * Fulfil a fiat order: platform wallet buys `qty` editions of `tokenId` on the
+ * primary market (paying `unitPriceWei` each in ETH) and transfers them to the
+ * customer wallet. Returns { ok, buyTx, transferTx, paidWei } or { ok:false, reason }.
+ */
+export async function buyAndDeliver({ tokenId, qty, unitPriceWei, to }) {
+  if (!deliveryConfigured) return { ok: false, reason: "delivery wallet not configured" };
+  if (!/^0x[0-9a-fA-F]{40}$/.test(to || "")) return { ok: false, reason: "bad recipient address" };
+  try {
+    const value = BigInt(unitPriceWei) * BigInt(qty);
+    const buyTx = await deliveryWallet.writeContract({
+      address: MUSIC_CONTRACT, abi: musicWriteAbi, functionName: "buy",
+      args: [BigInt(tokenId), BigInt(qty)], value,
+    });
+    const buyRcpt = await publicClient.waitForTransactionReceipt({ hash: buyTx });
+    if (buyRcpt.status !== "success") return { ok: false, reason: "on-chain buy reverted", buyTx };
+
+    const transferTx = await deliveryWallet.writeContract({
+      address: MUSIC_CONTRACT, abi: musicWriteAbi, functionName: "safeTransferFrom",
+      args: [deliveryAccount.address, to, BigInt(tokenId), BigInt(qty), "0x"],
+    });
+    const xferRcpt = await publicClient.waitForTransactionReceipt({ hash: transferTx });
+    if (xferRcpt.status !== "success") return { ok: false, reason: "delivery transfer reverted", buyTx, transferTx };
+
+    return { ok: true, buyTx, transferTx, paidWei: value.toString() };
+  } catch (e) {
+    return { ok: false, reason: String(e.shortMessage || e.message || e) };
+  }
+}
 
 /**
  * Verify a primary purchase actually happened on-chain for the given txHash.

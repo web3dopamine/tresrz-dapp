@@ -1,0 +1,48 @@
+"use client";
+import { useEffect, useState } from "react";
+import { BASE } from "@/lib/api";
+
+// Shared ETH→USD rate for price display. One fetch per page load (module-level
+// cache + in-flight dedupe), refreshed every 60s while any component is mounted.
+let cached: number | null = null;
+let fetchedAt = 0;
+let inflight: Promise<number | null> | null = null;
+
+async function getRate(): Promise<number | null> {
+  if (cached && Date.now() - fetchedAt < 60_000) return cached;
+  if (!inflight) {
+    inflight = fetch(`${BASE}/api/rate`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.usdPerEth > 0) { cached = d.usdPerEth; fetchedAt = Date.now(); }
+        return cached;
+      })
+      .catch(() => cached)
+      .finally(() => { inflight = null; });
+  }
+  return inflight;
+}
+
+export function useUsdRate(): number | null {
+  const [rate, setRate] = useState<number | null>(cached);
+  useEffect(() => {
+    let alive = true;
+    getRate().then((r) => alive && setRate(r));
+    const id = setInterval(() => getRate().then((r) => alive && setRate(r)), 60_000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+  return rate;
+}
+
+/** wei -> "$1,234.56" (null when the rate isn't loaded yet) */
+export function usd(wei: string | bigint | null | undefined, rate: number | null): string | null {
+  if (wei == null || rate == null) return null;
+  try {
+    const eth = Number(BigInt(wei)) / 1e18;
+    const v = eth * rate;
+    if (!Number.isFinite(v)) return null;
+    return v.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: v < 1 ? 4 : 2 });
+  } catch {
+    return null;
+  }
+}

@@ -10,6 +10,8 @@ import saleRoutes from "./routes/sales.js";
 import uploadRoutes from "./routes/upload.js";
 import streamRoutes from "./routes/stream.js";
 import adminRoutes from "./routes/admin.js";
+import rateRoutes from "./routes/rate.js";
+import fiatRoutes, { fiatWebhook } from "./routes/fiat.js";
 import { UPLOAD_DIR } from "./ipfs.js";
 
 // Fail fast: a missing/placeholder JWT_SECRET means every token is forgeable.
@@ -24,6 +26,9 @@ const app = express();
 // set X-Forwarded-For. Trust one proxy hop so req.ip is the real client and
 // express-rate-limit accepts the forwarded header instead of crashing.
 app.set("trust proxy", 1);
+// Stripe webhook needs the raw request body for signature verification —
+// mount it before the JSON parser touches anything.
+app.post("/api/fiat/webhook", express.raw({ type: "application/json" }), fiatWebhook);
 app.use(express.json({ limit: "256kb" }));
 
 // --- rate limiting ---
@@ -67,6 +72,8 @@ app.use("/api/sales", strictLimiter, saleRoutes);
 app.use("/api/upload", strictLimiter, uploadRoutes);
 app.use("/api/stream", streamRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/rate", rateRoutes);
+app.use("/api/fiat", strictLimiter, fiatRoutes);
 
 // 404 + central error handler so a thrown/rejected handler returns JSON, never crashes.
 app.use((_req, res) => res.status(404).json({ error: "not found" }));

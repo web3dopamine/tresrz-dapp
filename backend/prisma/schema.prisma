@@ -70,9 +70,10 @@ model Sale {
   buyerId  String
   seller   User?    @relation("SellerSales", fields: [sellerId], references: [id])
   sellerId String?                                  // null for primary sales
-  kind     String   @default("primary")             // primary | secondary_listing | secondary_offer
+  kind     String   @default("primary")             // primary | secondary_listing | secondary_offer | fiat_primary
   qty      Int
   priceWei String                                    // total paid (wei)
   txHash   String   @unique
+  stripeSessionId String? @unique                    // set for fiat (card) purchases — idempotency key
   createdAt DateTime @default(now())
 }

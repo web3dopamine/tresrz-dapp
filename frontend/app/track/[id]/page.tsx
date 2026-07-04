@@ -11,6 +11,7 @@ import { api, type Track, type SaleHistory } from "@/lib/api";
 import { musicAbi, MUSIC_CONTRACT } from "@/lib/abi";
 import { marketAbi, MARKET_CONTRACT } from "@/lib/marketAbi";
 import { useAuth } from "@/lib/auth";
+import { useUsdRate, usd } from "@/lib/usd";
 
 // Block explorer for the active chain (used for on-chain provenance links).
 const CHAIN_ID = Number(process.env.NEXT_PUBLIC_DEFAULT_CHAIN || 31337);
@@ -96,6 +97,42 @@ export default function TrackPage() {
   // opensea-style layout state: right-column tab + inline make-offer form
   const [tab, setTab] = useState<"details" | "orders" | "activity">("details");
   const [showOffer, setShowOffer] = useState(false);
+  // USD pricing + Stripe card checkout
+  const rate = useUsdRate();
+  const [fiatEnabled, setFiatEnabled] = useState(false);
+  const [cardBusy, setCardBusy] = useState(false);
+
+  useEffect(() => { api.fiatStatus().then((d) => setFiatEnabled(d.enabled)).catch(() => {}); }, []);
+
+  // returning from Stripe checkout: surface the outcome, then refresh once the
+  // on-chain delivery (2 txs) has had time to land
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const fiat = p.get("fiat");
+    if (!fiat) return;
+    window.history.replaceState({}, "", window.location.pathname);
+    if (fiat === "success") {
+      toast("💳 Payment received — your editions are being delivered on-chain (~1 min)");
+      setTimeout(() => { refreshChain(); }, 45000);
+    } else if (fiat === "cancelled") {
+      toast("Card checkout cancelled");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function onBuyCard() {
+    if (!track) return;
+    if (!token) return toast("Sign in with your wallet first — the editions are delivered to it");
+    setCardBusy(true);
+    try {
+      const { url } = await api.fiatCheckout({ trackId: track.id, qty: 1 });
+      window.location.href = url;
+    } catch (e: any) {
+      toast(e?.message || "Could not start card checkout");
+    } finally {
+      setCardBusy(false);
+    }
+  }
 
   function toast(m: string) { setMsg(m); clearTimeout(tRef.current); tRef.current = setTimeout(() => setMsg(""), 2400); }
 
@@ -342,8 +379,8 @@ export default function TrackPage() {
 
               {/* stat strip: top offer / last sale / left / royalty */}
               <div className="os-statbar">
-                <div><span>TOP OFFER</span><b>{topOffer !== null ? `${ethStr(topOffer)} ETH` : "—"}</b></div>
-                <div><span>LAST SALE</span><b>{lastSale ? `${ethStr(lastSale)} ETH` : "—"}</b></div>
+                <div><span>TOP OFFER</span><b>{topOffer !== null ? (usd(topOffer, rate) ?? `${ethStr(topOffer)} ETH`) : "—"}</b></div>
+                <div><span>LAST SALE</span><b>{lastSale ? (usd(lastSale, rate) ?? `${ethStr(lastSale)} ETH`) : "—"}</b></div>
                 <div><span>EDITIONS LEFT</span><b>{track.left} / {track.maxSupply}</b></div>
                 <div><span>ROYALTY</span><b>{chainInfo?.royaltyPct != null ? `${chainInfo.royaltyPct}%` : "—"}</b></div>
               </div>
@@ -351,11 +388,20 @@ export default function TrackPage() {
               {/* buy panel */}
               <div className="os-buybox">
                 <span className="os-buy-label">BUY FOR</span>
-                <div className="os-price">{priceEth.toFixed(3)} <small>ETH</small></div>
+                {rate ? (
+                  <div className="os-price">{usd(track.priceWei, rate)} <small>{priceEth.toFixed(3)} ETH</small></div>
+                ) : (
+                  <div className="os-price">{priceEth.toFixed(3)} <small>ETH</small></div>
+                )}
                 <div className="os-buy-actions">
                   <button className="buy os-buynow" disabled={busy || track.left === 0} onClick={onBuy}>
                     {track.left === 0 ? "SOLD OUT" : busy ? "CONFIRMING…" : "BUY NOW"}
                   </button>
+                  {fiatEnabled && track.left > 0 && (
+                    <button className="os-makeoffer os-card" disabled={cardBusy} onClick={onBuyCard} title="Pay in USD with a card — editions are delivered to your wallet">
+                      {cardBusy ? "…" : "💳 BUY WITH CARD"}
+                    </button>
+                  )}
                   <button
                     className="os-makeoffer"
                     disabled={chainTokenId == null}
@@ -427,9 +473,9 @@ export default function TrackPage() {
                     <ul className="tk-history">
                       {history.map((h, i) => (
                         <li key={i}>
-                          <span className={`tk-kind tk-${h.kind === "primary" ? "pri" : "sec"}`}>{h.kind.replace("secondary_", "")}</span>
+                          <span className={`tk-kind tk-${h.kind.includes("primary") ? "pri" : "sec"}`}>{h.kind.replace("secondary_", "").replace("fiat_primary", "card")}</span>
                           <span className="tk-qty">×{h.qty}</span>
-                          <span className="tk-price">{ethStr(h.unitWei)} ETH</span>
+                          <span className="tk-price">{usd(h.unitWei, rate) ?? `${ethStr(h.unitWei)} ETH`}</span>
                           <span className="tk-date">{new Date(h.at).toLocaleDateString()}</span>
                         </li>
                       ))}
@@ -453,7 +499,7 @@ export default function TrackPage() {
                       return (
                         <li key={l.id} className={editListing?.id === l.id ? "tk-editing" : undefined}>
                           <div className="tk-listing-row">
-                            <span><b>{l.qty}</b> edition{l.qty > 1 ? "s" : ""} @ <b>{ethStr(l.unit)} ETH</b></span>
+                            <span><b>{l.qty}</b> edition{l.qty > 1 ? "s" : ""} @ <b>{usd(l.unit, rate) ?? `${ethStr(l.unit)} ETH`}</b>{rate && <small className="tk-seller"> ({ethStr(l.unit)} ETH)</small>}</span>
                             <span className="tk-seller">seller {l.seller.slice(0, 6)}…{l.seller.slice(-4)}</span>
                             {mine ? (
                               <span className="tk-own-actions">
@@ -516,7 +562,7 @@ export default function TrackPage() {
                         return (
                           <li key={o.id}>
                             <div className="tk-listing-row">
-                              <span><b>{o.qty}</b> edition{o.qty > 1 ? "s" : ""} @ <b>{ethStr(o.unit)} ETH</b> <small className="tk-seller">({ethStr(o.unit * BigInt(o.qty))} ETH total, escrowed)</small></span>
+                              <span><b>{o.qty}</b> edition{o.qty > 1 ? "s" : ""} @ <b>{usd(o.unit, rate) ?? `${ethStr(o.unit)} ETH`}</b> <small className="tk-seller">({ethStr(o.unit * BigInt(o.qty))} ETH total, escrowed)</small></span>
                               <span className="tk-seller">from {o.buyer.slice(0, 6)}…{o.buyer.slice(-4)}</span>
                               {mine ? (
                                 <span className="tk-own-actions">
@@ -593,6 +639,7 @@ export default function TrackPage() {
         .os-makeoffer { flex: 1 1 120px; font-family: var(--mono, monospace); font-weight: 700; font-size: 12px; letter-spacing: 1.5px; color: var(--ink, #fff); background: transparent; border: 1.5px solid var(--card-line); border-radius: 4px; padding: 14px 16px; cursor: pointer; transition: .2s; }
         .os-makeoffer:hover:not(:disabled) { border-color: var(--crimson, #f58426); box-shadow: var(--glow); }
         .os-makeoffer:disabled { opacity: .5; cursor: not-allowed; }
+        .os-card { border-color: var(--crimson, #f58426); color: var(--crimson-soft, #ffa052); }
         .os-offer-row { margin-top: 6px; }
         .os-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-top: 6px; }
         .os-tab { font-family: var(--mono, monospace); font-weight: 700; font-size: 12px; letter-spacing: 1.5px; color: var(--muted, #bec0c2); background: none; border: none; border-bottom: 2.5px solid transparent; padding: 11px 14px; cursor: pointer; transition: .2s; }

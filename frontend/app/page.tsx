@@ -9,6 +9,7 @@ import CookieBanner from "@/components/CookieBanner";
 import { CoverArt, avatarUrl } from "@/lib/art";
 import { api, type Track, type Artist, type TrendingTrack, type TrendWindow } from "@/lib/api";
 import { useBuyTrack } from "@/lib/useBuyTrack";
+import { useUsdRate, usd } from "@/lib/usd";
 import { formatEther } from "viem";
 
 // Fallback demo data so the UI renders even before the backend/seed is up
@@ -43,6 +44,7 @@ export default function Home() {
   const [trendRows, setTrendRows] = useState<TrendingTrack[] | null>(null);
   const tRef = useRef<any>(null);
   const { buy, busy } = useBuyTrack();
+  const rate = useUsdRate();
 
   function toast(m: string) { setMsg(m); clearTimeout(tRef.current); tRef.current = setTimeout(() => setMsg(""), 2200); }
 
@@ -106,7 +108,7 @@ export default function Home() {
               <div className="feat-info">
                 <h3>{t.title}</h3>
                 <p>
-                  <b>{eth(t.priceWei)} ETH</b>
+                  <b>{usd(t.priceWei, rate) ?? `${eth(t.priceWei)} ETH`}</b>
                   <span>· {t.left} of {t.maxSupply} left</span>
                 </p>
                 <em>by {t.artist.handle}</em>
@@ -194,10 +196,13 @@ export default function Home() {
                   <small>{t.artist.handle} · {t.genre}</small>
                 </span>
               </span>
-              <span className="tt-num"><b>{eth(t.priceWei, 3)}</b> <small>ETH</small></span>
+              <span className="tt-num">
+                <b>{usd(t.priceWei, rate) ?? `${eth(t.priceWei, 3)} ETH`}</b>
+                {rate && <small> {eth(t.priceWei, 3)} ETH</small>}
+              </span>
               <span className="tt-num tt-vol">
                 {t.windowVolumeWei && t.windowVolumeWei !== "0"
-                  ? <><b>{eth(t.windowVolumeWei, 4)}</b> <small>ETH · {t.windowSales} sale{(t.windowSales ?? 0) !== 1 ? "s" : ""}</small></>
+                  ? <><b>{usd(t.windowVolumeWei, rate) ?? `${eth(t.windowVolumeWei, 4)} ETH`}</b> <small>{t.windowSales} sale{(t.windowSales ?? 0) !== 1 ? "s" : ""}</small></>
                   : <small>—</small>}
               </span>
               <span className="tt-num tt-left">{t.left} / {t.maxSupply}</span>
