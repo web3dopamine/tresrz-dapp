@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../db.js";
 import { requireAuth } from "../middleware/auth.js";
 import { verifyPurchase, verifySecondarySale, chainConfigured } from "../chain.js";
+import { creditEarningsTx, artistShareWei } from "./creator.js";
 const r = Router();
 
 // GET /api/sales/history/:trackId  -> price history (primary + secondary) for a
@@ -56,12 +57,17 @@ r.post("/", requireAuth, async (req, res) => {
   });
   if (!v.ok) return res.status(400).json({ error: "purchase not verified on-chain", reason: v.reason });
 
+  // Accounting uses ONLY the on-chain-verified paid amount, never client input,
+  // so a custodial creator can't inflate their balance via a forged priceWei.
+  const verifiedPaid = String(v.paid ?? "0");
   try {
     const sale = await prisma.$transaction(async (tx) => {
       const s = await tx.sale.create({
-        data: { trackId, buyerId: req.user.id, qty: q, priceWei: String(priceWei ?? v.paid ?? "0"), txHash },
+        data: { trackId, buyerId: req.user.id, qty: q, priceWei: verifiedPaid, txHash },
       });
       await tx.track.update({ where: { id: trackId }, data: { minted: { increment: q } } });
+      // credit a custodial creator their verified share — atomic with the sale
+      await creditEarningsTx(tx, trackId, artistShareWei(verifiedPaid));
       return s;
     });
     res.status(201).json(sale);

@@ -9,16 +9,33 @@ datasource db {
 
 model User {
   id        String   @id @default(cuid())
-  address   String   @unique            // checksummed wallet address
+  address   String?  @unique            // wallet address (null for custodial, wallet-less creators)
+  email     String?                      // custodial creators' contact (NOT identity — unverified; the manage token is the identity)
   handle    String?  @unique
   avatarSeed Int     @default(0)
   bio       String?
   flagged   Boolean  @default(false)    // admin moderation flag
+  custodial Boolean  @default(false)    // wallet-less creator: platform mints & holds earnings
+  balanceWei String  @default("0")      // accrued custodial earnings, withdrawable (wei)
+  manageTokenHash String?               // sha256 of the bearer token that controls this custodial account
   createdAt DateTime @default(now())
   tracks    Track[]  @relation("ArtistTracks")
   likes     Like[]
   sales     Sale[]   @relation("BuyerSales")
   soldSales Sale[]   @relation("SellerSales")
+  payouts   Payout[]
+}
+
+// Custodial creator withdrawal of accrued earnings to a wallet address.
+model Payout {
+  id        String   @id @default(cuid())
+  creator   User     @relation(fields: [creatorId], references: [id])
+  creatorId String
+  amountWei String
+  toAddress String
+  txHash    String?
+  status    String   @default("pending") // pending | sent | failed
+  createdAt DateTime @default(now())
 }
 
 model Track {
@@ -40,6 +57,7 @@ model Track {
   artistId     String
   hot          Boolean  @default(false)  // "featured" flag (admin-controlled)
   flagged      Boolean  @default(false)  // admin moderation flag (hidden from listings)
+  custodial    Boolean  @default(false)  // minted by platform on behalf of a wallet-less creator
   createdAt    DateTime @default(now())
   likes        Like[]
   sales        Sale[]

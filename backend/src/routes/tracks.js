@@ -4,6 +4,15 @@ import { requireAuth, optionalAuth } from "../middleware/auth.js";
 
 const r = Router();
 
+// Display shape for an artist that may be a custodial (wallet-less) creator:
+// no address, so fall back to the creator id for profile links and derive a
+// handle from handle -> email prefix -> short address/id.
+export function artistShape(a) {
+  const key = a.address || a.id;
+  const handle = a.handle || (a.email ? a.email.split("@")[0] : (a.address ? a.address.slice(0, 6) + "…" : "Creator"));
+  return { id: a.id, handle, address: key, avatarSeed: a.avatarSeed, custodial: a.custodial };
+}
+
 const shape = (t, userId) => ({
   id: t.id,
   chainTokenId: t.chainTokenId,
@@ -21,7 +30,8 @@ const shape = (t, userId) => ({
   left: t.maxSupply - t.minted,
   hot: t.hot,
   flagged: t.flagged,
-  artist: { id: t.artist.id, handle: t.artist.handle || t.artist.address.slice(0, 6) + "…", address: t.artist.address, avatarSeed: t.artist.avatarSeed },
+  custodial: t.custodial,
+  artist: artistShape(t.artist),
   likes: t._count?.likes ?? 0,
   liked: userId ? t.likes?.some((l) => l.userId === userId) : false,
   txHash: t.txHash,

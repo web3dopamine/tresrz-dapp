@@ -1,7 +1,10 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
 import { optionalAuth } from "../middleware/auth.js";
+import { artistShape } from "./tracks.js";
 const r = Router();
+
+const displayHandle = (u) => u.handle || (u.email ? u.email.split("@")[0] : (u.address ? u.address.slice(0, 6) + "…" + u.address.slice(-4) : "Creator"));
 
 const shapeTrack = (t, userId) => ({
   id: t.id,
@@ -15,7 +18,8 @@ const shapeTrack = (t, userId) => ({
   minted: t.minted,
   left: t.maxSupply - t.minted,
   hot: t.hot,
-  artist: { id: t.artist.id, handle: t.artist.handle || t.artist.address.slice(0, 6) + "…", address: t.artist.address, avatarSeed: t.artist.avatarSeed },
+  custodial: t.custodial,
+  artist: artistShape(t.artist),
   likes: t._count?.likes ?? 0,
   liked: userId ? t.likes?.some((l) => l.userId === userId) : false,
   txHash: t.txHash,
@@ -33,8 +37,8 @@ r.get("/", async (_req, res) => {
   const out = users
     .map((u) => ({
       id: u.id,
-      handle: u.handle || u.address.slice(0, 6) + "…" + u.address.slice(-4),
-      address: u.address,
+      handle: displayHandle(u),
+      address: u.address || u.id, // custodial creators have no wallet — key by id
       avatarSeed: u.avatarSeed,
       nftCount: u._count.tracks,
       likes: u.tracks.reduce((s, t) => s + t._count.likes, 0),
@@ -61,10 +65,11 @@ r.get("/:key", optionalAuth, async (req, res) => {
     const tracks = user.tracks.map((t) => shapeTrack(t, req.user?.id));
     res.json({
       id: user.id,
-      handle: user.handle || user.address.slice(0, 6) + "…" + user.address.slice(-4),
-      address: user.address,
+      handle: displayHandle(user),
+      address: user.address || user.id,
       avatarSeed: user.avatarSeed,
       bio: user.bio,
+      custodial: user.custodial,
       nftCount: tracks.length,
       totalLikes: tracks.reduce((s, t) => s + t.likes, 0),
       tracks,

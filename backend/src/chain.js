@@ -93,7 +93,67 @@ const musicWriteAbi = [
     { name: "id", type: "uint256" }, { name: "amount", type: "uint256" }, { name: "data", type: "bytes" },
   ], outputs: [] },
   { type: "function", name: "editionsLeft", stateMutability: "view", inputs: [{ name: "trackId", type: "uint256" }], outputs: [{ type: "uint64" }] },
+  { type: "function", name: "mintTrack", stateMutability: "nonpayable", inputs: [
+    { name: "maxSupply", type: "uint64" }, { name: "price", type: "uint96" }, { name: "royaltyBps", type: "uint96" }, { name: "metadataUri", type: "string" }],
+    outputs: [{ name: "trackId", type: "uint256" }] },
+  { type: "event", name: "TrackMinted", inputs: [
+    { name: "trackId", type: "uint256", indexed: true }, { name: "artist", type: "address", indexed: true },
+    { name: "maxSupply", type: "uint64", indexed: false }, { name: "price", type: "uint96", indexed: false }, { name: "uri", type: "string", indexed: false }] },
 ];
+
+/**
+ * Mint a track from the platform wallet (custodial creators have no wallet).
+ * The platform is the on-chain artist; earnings are credited to the creator's
+ * off-chain balance and paid out on withdrawal. Returns { ok, trackId, txHash }.
+ */
+export async function platformMint({ maxSupply, priceWei, royaltyBps, metadataUri }) {
+  if (!deliveryConfigured) return { ok: false, reason: "platform mint wallet not configured" };
+  try {
+    const hash = await deliveryWallet.writeContract({
+      address: MUSIC_CONTRACT, abi: musicWriteAbi, functionName: "mintTrack",
+      args: [BigInt(maxSupply), BigInt(priceWei), BigInt(royaltyBps), metadataUri],
+    });
+    const rc = await publicClient.waitForTransactionReceipt({ hash });
+    if (rc.status !== "success") return { ok: false, reason: "mint reverted", txHash: hash };
+    const ev = parseEventLogs({ abi: musicWriteAbi, eventName: "TrackMinted", logs: rc.logs })[0];
+    if (ev?.args?.trackId === undefined) return { ok: false, reason: "TrackMinted event missing", txHash: hash };
+    return { ok: true, trackId: Number(ev.args.trackId), txHash: hash };
+  } catch (e) {
+    return { ok: false, reason: String(e.shortMessage || e.message || e) };
+  }
+}
+
+/**
+ * Send ETH from the platform wallet (custodial creator withdrawals).
+ * Returns { ok:true, txHash } on confirmed success, { ok:false, pending:true,
+ * txHash } when the tx was BROADCAST but the receipt couldn't be confirmed
+ * (caller must NOT refund — the ETH may have left), or { ok:false } for a
+ * definitive pre-broadcast failure (safe to refund).
+ */
+export async function sendEth({ to, wei }) {
+  if (!deliveryConfigured) return { ok: false, reason: "platform wallet not configured" };
+  if (!/^0x[0-9a-fA-F]{40}$/.test(to || "")) return { ok: false, reason: "bad address" };
+  const value = (() => { try { return BigInt(wei); } catch { return -1n; } })();
+  if (value <= 0n) return { ok: false, reason: "nothing to withdraw" };
+  let hash;
+  try {
+    const bal = await publicClient.getBalance({ address: deliveryAccount.address });
+    if (bal < value) return { ok: false, reason: "platform float too low, contact support" };
+    hash = await deliveryWallet.sendTransaction({ to, value });
+  } catch (e) {
+    // failure before/at broadcast — nothing left the wallet, safe to refund
+    return { ok: false, reason: String(e.shortMessage || e.message || e) };
+  }
+  // tx is broadcast (we hold a hash). A receipt failure here is UNKNOWN, not
+  // a refundable failure.
+  try {
+    const rc = await publicClient.waitForTransactionReceipt({ hash });
+    if (rc.status === "success") return { ok: true, txHash: hash };
+    return { ok: false, reason: "transfer reverted", txHash: hash }; // reverted = funds returned, refundable
+  } catch (e) {
+    return { ok: false, pending: true, txHash: hash, reason: String(e.shortMessage || e.message || e) };
+  }
+}
 
 export const deliveryBalanceOf = (tokenId) =>
   deliveryConfigured ? balanceOf(deliveryAccount.address, tokenId) : Promise.resolve(0n);
@@ -120,6 +180,17 @@ export async function submitBuy({ tokenId, qty, unitPriceWei }) {
     return { ok: true, hash, paidWei: value.toString() };
   } catch (e) {
     return { ok: false, reason: String(e.shortMessage || e.message || e) };
+  }
+}
+
+/** Non-blocking status of a submitted tx: "success" | "reverted" | "pending". */
+export async function txStatus(hash) {
+  if (!chainConfigured) return "pending";
+  try {
+    const rc = await publicClient.getTransactionReceipt({ hash });
+    return rc.status === "success" ? "success" : "reverted";
+  } catch {
+    return "pending"; // not mined yet (or unknown)
   }
 }
 

@@ -12,6 +12,8 @@ import streamRoutes from "./routes/stream.js";
 import adminRoutes from "./routes/admin.js";
 import rateRoutes from "./routes/rate.js";
 import fiatRoutes, { fiatWebhook, startFiatReconciler } from "./routes/fiat.js";
+import mintRoutes from "./routes/mint.js";
+import creatorRoutes, { startPayoutReconciler } from "./routes/creator.js";
 import { UPLOAD_DIR } from "./ipfs.js";
 
 // Fail fast: a missing/placeholder JWT_SECRET means every token is forgeable.
@@ -36,6 +38,9 @@ app.use(express.json({ limit: "256kb" }));
 // abuse-prone, write paths). Counts per client IP.
 const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 600, standardHeaders: true, legacyHeaders: false });
 const strictLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false, message: { error: "too many requests, slow down" } });
+// Custodial mint has the platform pay gas, so it's tightly capped per IP
+// (anti gas-drain). A global daily cap is also enforced in the route.
+const mintLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: Number(process.env.MINT_HOURLY_CAP || 6), standardHeaders: true, legacyHeaders: false, message: { error: "minting limit reached for now, try again later" } });
 
 // Allowed browser origins (frontend). "*" if unset (dev convenience).
 const allowedOrigins = (process.env.CORS_ORIGIN || "")
@@ -74,6 +79,8 @@ app.use("/api/stream", streamRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/rate", rateRoutes);
 app.use("/api/fiat", strictLimiter, fiatRoutes);
+app.use("/api/mint", mintLimiter, mintRoutes);
+app.use("/api/creator", strictLimiter, creatorRoutes);
 
 // 404 + central error handler so a thrown/rejected handler returns JSON, never crashes.
 app.use((_req, res) => res.status(404).json({ error: "not found" }));
@@ -91,4 +98,5 @@ const port = process.env.PORT || 4000;
 app.listen(port, () => {
   console.log(`TRESRZ API on :${port}`);
   startFiatReconciler(); // heals card orders stuck by crashes/timeouts
+  startPayoutReconciler(); // finalizes/restores custodial withdrawals
 });
