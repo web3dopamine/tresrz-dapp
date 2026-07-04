@@ -52,6 +52,51 @@ r.get("/", optionalAuth, async (req, res) => {
   res.json(tracks.map((t) => shape(t, req.user?.id)));
 });
 
+// GET /api/tracks/trending?window=1h|1d|7d|all  -> tracks ranked by sales
+// volume inside the window (then sale count, then all-time likes). Each row
+// carries windowVolumeWei + windowSales so the UI can show a VOLUME column.
+// NOTE: must be registered before /:id or "trending" is parsed as a track id.
+const WINDOWS = { "1h": 3600e3, "1d": 86400e3, "7d": 7 * 86400e3 };
+r.get("/trending", optionalAuth, async (req, res) => {
+  const win = String(req.query.window || "1d").toLowerCase();
+  const ms = WINDOWS[win] ?? null; // anything else (e.g. "all") = no time filter
+  const since = ms ? new Date(Date.now() - ms) : null;
+
+  const sales = await prisma.sale.findMany({
+    where: since ? { createdAt: { gte: since } } : {},
+    select: { trackId: true, qty: true, priceWei: true },
+  });
+  const agg = new Map(); // trackId -> { volume: bigint, count: number }
+  for (const s of sales) {
+    const a = agg.get(s.trackId) || { volume: 0n, count: 0 };
+    try { a.volume += BigInt(s.priceWei); } catch {}
+    a.count += s.qty;
+    agg.set(s.trackId, a);
+  }
+
+  const tracks = await prisma.track.findMany({
+    where: { flagged: false, artist: { flagged: false } },
+    include: { artist: true, _count: { select: { likes: true } }, likes: req.user ? { where: { userId: req.user.id } } : false },
+  });
+  const ranked = tracks
+    .map((t) => {
+      const a = agg.get(t.id) || { volume: 0n, count: 0 };
+      return { t, volume: a.volume, count: a.count };
+    })
+    .sort((x, y) => {
+      if (x.volume !== y.volume) return x.volume > y.volume ? -1 : 1;
+      if (x.count !== y.count) return y.count - x.count;
+      return (y.t._count?.likes ?? 0) - (x.t._count?.likes ?? 0);
+    })
+    .slice(0, Number(req.query.limit) || 10)
+    .map(({ t, volume, count }) => ({
+      ...shape(t, req.user?.id),
+      windowVolumeWei: volume.toString(),
+      windowSales: count,
+    }));
+  res.json(ranked);
+});
+
 r.get("/:id", optionalAuth, async (req, res) => {
   const t = await prisma.track.findUnique({
     where: { id: req.params.id },

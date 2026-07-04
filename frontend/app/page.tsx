@@ -7,7 +7,7 @@ import ArtistCard from "@/components/ArtistCard";
 import DropCard from "@/components/DropCard";
 import CookieBanner from "@/components/CookieBanner";
 import { CoverArt, avatarUrl } from "@/lib/art";
-import { api, type Track, type Artist } from "@/lib/api";
+import { api, type Track, type Artist, type TrendingTrack, type TrendWindow } from "@/lib/api";
 import { useBuyTrack } from "@/lib/useBuyTrack";
 import { formatEther } from "viem";
 
@@ -39,6 +39,8 @@ export default function Home() {
   const [search, setSearch] = useState("");
   const [genre, setGenre] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
+  const [trendWindow, setTrendWindow] = useState<TrendWindow>("1d");
+  const [trendRows, setTrendRows] = useState<TrendingTrack[] | null>(null);
   const tRef = useRef<any>(null);
   const { buy, busy } = useBuyTrack();
 
@@ -49,6 +51,10 @@ export default function Home() {
     api.tracks("?limit=12").then((d) => d.length && setLatest(d)).catch(() => {});
     api.artists().then((d) => d.length && setArtists(d)).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    api.trending(trendWindow).then(setTrendRows).catch(() => setTrendRows(null));
+  }, [trendWindow]);
 
   const q = search.toLowerCase();
   const matches = (t: Track) =>
@@ -61,22 +67,25 @@ export default function Home() {
     [hot, latest],
   );
 
-  // featured carousel = hot tracks; trending = all unique tracks by likes
+  // featured carousel = hot tracks; trending = server-ranked by window volume,
+  // falling back to a client-side likes ranking while the API loads / demo mode
   const featured = fHot.slice(0, 8);
-  const trending = useMemo(() => {
+  const trending: (Track & { windowVolumeWei?: string; windowSales?: number })[] = useMemo(() => {
+    if (trendRows) return trendRows.filter(matches);
     const seen = new Set<string>();
     return [...hot, ...latest]
       .filter((t) => (seen.has(t.id) ? false : (seen.add(t.id), true)))
       .filter(matches)
       .sort((a, b) => b.likes - a.likes || b.minted - a.minted)
       .slice(0, 10);
-  }, [hot, latest, q, genre]);
+  }, [trendRows, hot, latest, q, genre]);
 
   async function onQuickBuy(t: Track) {
     const res = await buy(t);
     if (!res.ok) return toast(res.error);
     toast(res.warn ? `⚠ ${res.warn}` : `Bought ${t.title} ✓`);
     api.tracks("?hot=true").then((d) => d.length && setHot(d)).catch(() => {});
+    api.trending(trendWindow).then(setTrendRows).catch(() => {});
   }
 
   return (
@@ -119,11 +128,24 @@ export default function Home() {
       <section className="me-block">
         <div className="sec-head">
           <div className="sec-title">TRENDING</div>
-          <Link className="sec-more" href="#latest">See all →</Link>
+          <div className="tt-tabs" role="tablist" aria-label="Trending window">
+            {(["1h", "1d", "7d", "all"] as TrendWindow[]).map((w) => (
+              <button
+                key={w}
+                role="tab"
+                aria-selected={trendWindow === w}
+                className={`tt-tab${trendWindow === w ? " active" : ""}`}
+                onClick={() => setTrendWindow(w)}
+              >
+                {w.toUpperCase()}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="trend-table">
           <div className="trend-tr trend-th">
             <span>#</span><span>TRACK</span><span className="tt-num">PRICE</span>
+            <span className="tt-num tt-vol">VOL ({trendWindow.toUpperCase()})</span>
             <span className="tt-num tt-left">LEFT</span><span className="tt-num tt-likes">LIKES</span><span />
           </div>
           {trending.length === 0 ? (
@@ -139,6 +161,11 @@ export default function Home() {
                 </span>
               </span>
               <span className="tt-num"><b>{eth(t.priceWei, 3)}</b> <small>ETH</small></span>
+              <span className="tt-num tt-vol">
+                {t.windowVolumeWei && t.windowVolumeWei !== "0"
+                  ? <><b>{eth(t.windowVolumeWei, 4)}</b> <small>ETH · {t.windowSales} sale{(t.windowSales ?? 0) !== 1 ? "s" : ""}</small></>
+                  : <small>—</small>}
+              </span>
               <span className="tt-num tt-left">{t.left} / {t.maxSupply}</span>
               <span className="tt-num tt-likes">♥ {t.likes}</span>
               <span className="tt-buy">

@@ -52,8 +52,12 @@ export type AdminStats = {
 export type AdminTrack = Track & { _count?: { likes: number; sales: number }; flagged: boolean };
 export type AdminUser = { id: string; address: string; handle: string | null; bio: string | null; flagged: boolean; createdAt: string; _count?: { tracks: number; sales: number } };
 
+export type TrendingTrack = Track & { windowVolumeWei: string; windowSales: number };
+export type TrendWindow = "1h" | "1d" | "7d" | "all";
+
 export const api = {
   tracks: (q = ""): Promise<Track[]> => req(`/api/tracks${q}`),
+  trending: (window: TrendWindow = "1d"): Promise<TrendingTrack[]> => req(`/api/tracks/trending?window=${window}`),
   track: (id: string): Promise<Track> => req(`/api/tracks/${id}`),
   artists: (): Promise<Artist[]> => req(`/api/artists`),
   artist: (key: string): Promise<ArtistDetail> => req(`/api/artists/${key}`),
