@@ -34,6 +34,20 @@ export function useUsdRate(): number | null {
   return rate;
 }
 
+/** wei -> compact ETH string that never rounds small prices to "0.000"
+ *  (0.00005 -> "0.00005", 0.85 -> "0.85", 1.97 -> "1.97", 12 -> "12") */
+export function fmtEth(wei: string | bigint | null | undefined): string {
+  if (wei == null) return "0";
+  try {
+    const v = Number(BigInt(wei)) / 1e18;
+    if (!Number.isFinite(v) || v === 0) return "0";
+    const s = v >= 0.01 ? v.toFixed(3) : v.toPrecision(2);
+    return String(parseFloat(s));
+  } catch {
+    return "0";
+  }
+}
+
 /** wei -> "$1,234.56" (null when the rate isn't loaded yet) */
 export function usd(wei: string | bigint | null | undefined, rate: number | null): string | null {
   if (wei == null || rate == null) return null;

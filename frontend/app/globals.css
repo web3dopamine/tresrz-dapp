@@ -434,3 +434,21 @@ nav{margin-left:0}
 [data-theme="light"] .bm-opt{border:2px solid var(--navy)}
 [data-theme="light"] .bm-opt input{border:2px solid var(--navy)}
 [data-theme="light"] .bm-close{border:2px solid var(--navy);color:var(--navy)}
+
+/* --- buy/claim modal extras --- */
+.bm-link{background:none;border:none;color:var(--crimson-soft);font-family:var(--mono);font-size:10.5px;letter-spacing:.5px;cursor:pointer;padding:0;text-align:left;text-decoration:underline;text-underline-offset:3px}
+.bm-link:hover{color:var(--ink)}
+.bm-addr{font-family:var(--mono);color:var(--crimson-soft)}
+.cm-panel{max-width:430px;display:flex;flex-direction:column;gap:12px}
+.cm-title{margin:0;padding-right:30px;font-size:17px;color:var(--ink);letter-spacing:.5px}
+.cm-text{margin:0;font-size:12.5px;line-height:1.7;color:var(--muted)}
+.cm-hint{margin:0;font-size:10.5px;color:var(--muted);opacity:.8}
+.cm-alt{background:transparent;color:var(--ink);border:1.5px solid var(--card-line)}
+.cm-panel input{background:transparent;border:1.5px solid rgba(245,132,38,.45);color:var(--ink);font-family:var(--mono);font-size:12px;padding:10px 11px;border-radius:4px;outline:none}
+.cm-panel input:focus{border-color:var(--crimson);box-shadow:var(--glow)}
+.cm-panel .buy{padding:12px;font-size:12px}
+.cm-spinner{width:26px;height:26px;border-radius:50%;border:3px solid var(--card-line);border-top-color:var(--crimson);animation:cmspin 
+.9s linear infinite;margin:6px auto 2px}
+@keyframes cmspin{to{transform:rotate(360deg)}}
+[data-theme="light"] .cm-panel input{border:2px solid var(--navy)}
+[data-theme="light"] .cm-alt{border:2px solid var(--navy);color:var(--navy)}

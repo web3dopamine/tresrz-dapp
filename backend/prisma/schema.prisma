@@ -43,6 +43,42 @@ model Track {
   createdAt    DateTime @default(now())
   likes        Like[]
   sales        Sale[]
+  fiatOrders   FiatOrder[]
+}
+
+// A card order fulfilled by the platform delivery wallet. The row is created
+// (status=processing) as the FIRST action in the webhook — its unique
+// stripeSessionId is the atomic idempotency lock, so concurrent Stripe
+// retries can never double-buy. State machine:
+//   processing -> (buy submitted, buyTx set) -> held      [guest: awaits claim]
+//                                            -> delivered [direct: auto-sent]
+//   processing -> refunded                                [oversell/revert]
+//   held -> delivering (deliveringAt set) -> delivered    [claim]
+// `delivering` is self-healing: a stale one (crash mid-transfer) is retried
+// by the reconciler after re-checking on-chain state, so no order is ever
+// permanently trapped.
+model FiatOrder {
+  id              String   @id @default(cuid())
+  stripeSessionId String   @unique                    // atomic lock + claim credential
+  paymentIntent   String?                             // for refunds
+  track           Track    @relation(fields: [trackId], references: [id])
+  trackId         String
+  chainTokenId    Int
+  qty             Int
+  unitPriceWei    String                              // per-edition primary price
+  paidWei         String   @default("0")              // ETH spent by delivery wallet
+  buyer           String?                             // known wallet (direct delivery) or null (guest claim)
+  buyTx           String?                             // on-chain primary buy tx (set right after submit)
+  status          String   @default("processing")     // processing | held | delivering | delivered | refunded | failed
+  mintedCounted   Boolean  @default(false)            // guards the one-time Track.minted increment
+  deliveredTo     String?                             // final claim wallet
+  deliverTx       String?                             // claim/delivery transfer tx
+  deliveringAt    DateTime?                            // set when a transfer is in flight (staleness clock)
+  attempts        Int      @default(0)
+  lastError       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deliveredAt     DateTime?
 }
 
 // SIWE login nonces. DB-backed so issued nonces survive an API restart (the old

@@ -7,6 +7,7 @@ import { useAccount, useReadContract, useReadContracts } from "wagmi";
 import Header from "@/components/Header";
 import WaveformPlayer from "@/components/WaveformPlayer";
 import BuyModal from "@/components/BuyModal";
+import ClaimModal from "@/components/ClaimModal";
 import { CoverArt, avatarUrl } from "@/lib/art";
 import { api, type Track, type SaleHistory } from "@/lib/api";
 import { musicAbi, MUSIC_CONTRACT } from "@/lib/abi";
@@ -38,7 +39,9 @@ type Offer = { id: number; buyer: string; tokenId: number; qty: number; unit: bi
 
 function ethStr(wei: bigint | string, dp = 3): string {
   try {
-    return Number(formatEther(typeof wei === "bigint" ? wei : BigInt(wei))).toFixed(dp);
+    const v = Number(formatEther(typeof wei === "bigint" ? wei : BigInt(wei)));
+    if (v > 0 && v < 0.01) return String(parseFloat(v.toPrecision(2))); // never round dust to "0.000"
+    return String(parseFloat(v.toFixed(dp)));
   } catch {
     return "0";
   }
@@ -99,17 +102,17 @@ export default function TrackPage() {
   // USD pricing + buy modal (card / crypto chooser)
   const rate = useUsdRate();
   const [buyOpen, setBuyOpen] = useState(false);
+  // Stripe success redirect -> claim/status modal driven by the session id
+  const [claimSession, setClaimSession] = useState<string | null>(null);
 
-  // returning from Stripe checkout: surface the outcome, then refresh once the
-  // on-chain delivery (2 txs) has had time to land
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     const fiat = p.get("fiat");
     if (!fiat) return;
+    const sid = p.get("session_id");
     window.history.replaceState({}, "", window.location.pathname);
-    if (fiat === "success") {
-      toast("💳 Payment received — your editions are being delivered on-chain (~1 min)");
-      setTimeout(() => { refreshChain(); }, 45000);
+    if (fiat === "success" && sid) {
+      setClaimSession(sid); // modal handles processing/held/delivered states
     } else if (fiat === "cancelled") {
       toast("Card checkout cancelled");
     }
@@ -363,9 +366,9 @@ export default function TrackPage() {
               <div className="os-buybox">
                 <span className="os-buy-label">BUY FOR</span>
                 {rate ? (
-                  <div className="os-price">{usd(track.priceWei, rate)} <small>{priceEth.toFixed(3)} ETH</small></div>
+                  <div className="os-price">{usd(track.priceWei, rate)} <small>{ethStr(track.priceWei)} ETH</small></div>
                 ) : (
-                  <div className="os-price">{priceEth.toFixed(3)} <small>ETH</small></div>
+                  <div className="os-price">{ethStr(track.priceWei)} <small>ETH</small></div>
                 )}
                 <div className="os-buy-actions">
                   <button className="buy os-buynow" disabled={track.left === 0} onClick={() => setBuyOpen(true)}>
@@ -590,6 +593,14 @@ export default function TrackPage() {
         toast={toast}
         onBought={() => { refreshChain(); }}
       />
+      {claimSession && (
+        <ClaimModal
+          sessionId={claimSession}
+          onClose={() => { setClaimSession(null); refreshChain(); }}
+          toast={toast}
+          onClaimed={() => { refreshChain(); }}
+        />
+      )}
       <div className={`toast${msg ? " show" : ""}`}>{msg}</div>
 
       <style jsx>{`

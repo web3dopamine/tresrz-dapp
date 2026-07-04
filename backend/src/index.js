@@ -11,7 +11,7 @@ import uploadRoutes from "./routes/upload.js";
 import streamRoutes from "./routes/stream.js";
 import adminRoutes from "./routes/admin.js";
 import rateRoutes from "./routes/rate.js";
-import fiatRoutes, { fiatWebhook } from "./routes/fiat.js";
+import fiatRoutes, { fiatWebhook, startFiatReconciler } from "./routes/fiat.js";
 import { UPLOAD_DIR } from "./ipfs.js";
 
 // Fail fast: a missing/placeholder JWT_SECRET means every token is forgeable.
@@ -88,4 +88,7 @@ process.on("unhandledRejection", (e) => console.error("unhandledRejection:", e))
 process.on("uncaughtException", (e) => console.error("uncaughtException:", e));
 
 const port = process.env.PORT || 4000;
-app.listen(port, () => console.log(`TRESRZ API on :${port}`));
+app.listen(port, () => {
+  console.log(`TRESRZ API on :${port}`);
+  startFiatReconciler(); // heals card orders stuck by crashes/timeouts
+});

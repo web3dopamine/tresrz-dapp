@@ -84,6 +84,10 @@ export const api = {
   fiatStatus: (): Promise<{ enabled: boolean }> => req(`/api/fiat/status`),
   fiatCheckout: (b: { trackId: string; qty: number; deliveryAddress?: string }): Promise<{ url: string }> =>
     req(`/api/fiat/checkout`, { method: "POST", body: JSON.stringify(b) }),
+  fiatOrder: (sessionId: string): Promise<{ status: "held" | "delivered" | "processing" | "refunded"; qty?: number; track?: { id: string; title: string; coverSeed: number }; deliveredTo?: string | null; deliverTx?: string | null }> =>
+    req(`/api/fiat/order?session_id=${encodeURIComponent(sessionId)}`),
+  fiatClaim: (b: { sessionId: string; address: string }): Promise<{ ok: boolean; deliverTx: string; deliveredTo: string }> =>
+    req(`/api/fiat/claim`, { method: "POST", body: JSON.stringify(b) }),
 
   // M4: admin
   adminStats: (): Promise<AdminStats> => req(`/api/admin/stats`),

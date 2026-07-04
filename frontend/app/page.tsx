@@ -30,7 +30,11 @@ const DEMO_ARTISTS: Artist[] = [
 ].map(([h, n, l], i) => ({ id: `ar${i}`, handle: h as string, address: "0x0", avatarSeed: i * 137 + 3, nftCount: n as number, likes: l as number }));
 
 function eth(wei: string, dp = 2): string {
-  try { return Number(formatEther(BigInt(wei))).toFixed(dp); } catch { return "0"; }
+  try {
+    const v = Number(formatEther(BigInt(wei)));
+    if (v > 0 && v < 0.01) return String(parseFloat(v.toPrecision(2))); // never round dust to "0.00"
+    return String(parseFloat(v.toFixed(dp)));
+  } catch { return "0"; }
 }
 
 export default function Home() {

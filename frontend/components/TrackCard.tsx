@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { CoverArt, avatarUrl } from "@/lib/art";
 import { api, type Track } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { useUsdRate, usd } from "@/lib/usd";
+import { useUsdRate, usd, fmtEth } from "@/lib/usd";
 import BuyModal from "@/components/BuyModal";
 
 export default function TrackCard({ t, toast }: { t: Track; toast: (m: string) => void }) {
@@ -73,7 +73,7 @@ export default function TrackCard({ t, toast }: { t: Track; toast: (m: string) =
         <img src={avatarUrl(t.artist.avatarSeed)} alt="" /><span>by <b>{t.artist.handle}</b></span>
       </Link>
       <div className="price">
-        {priceUsd ?? `${priceEth.toFixed(2)} ETH`} <em>{left} left</em>
+        {priceUsd ?? `${fmtEth(t.priceWei)} ETH`} <em>{left} left</em>
         <button className={`heart card-heart${liked ? " liked" : ""}`} onClick={onLike} aria-label="like">
           <svg viewBox="0 0 24 24"><path d="M12 21s-7-4.5-9.5-8.5C1 9 3 5.5 6.5 5.5c2 0 3.5 1.3 5.5 3 2-1.7 3.5-3 5.5-3C21 5.5 23 9 21.5 12.5 19 16.5 12 21 12 21z" /></svg>
           <small>{likes}</small>

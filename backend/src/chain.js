@@ -92,16 +92,57 @@ const musicWriteAbi = [
     { name: "from", type: "address" }, { name: "to", type: "address" },
     { name: "id", type: "uint256" }, { name: "amount", type: "uint256" }, { name: "data", type: "bytes" },
   ], outputs: [] },
+  { type: "function", name: "editionsLeft", stateMutability: "view", inputs: [{ name: "trackId", type: "uint256" }], outputs: [{ type: "uint64" }] },
 ];
 
-/**
- * Fulfil a fiat order: platform wallet buys `qty` editions of `tokenId` on the
- * primary market (paying `unitPriceWei` each in ETH) and transfers them to the
- * customer wallet. Returns { ok, buyTx, transferTx, paidWei } or { ok:false, reason }.
- */
-export async function buyAndDeliver({ tokenId, qty, unitPriceWei, to }) {
+export const deliveryBalanceOf = (tokenId) =>
+  deliveryConfigured ? balanceOf(deliveryAccount.address, tokenId) : Promise.resolve(0n);
+
+/** On-chain editions still available for primary purchase (source of truth). */
+export async function editionsLeft(tokenId) {
+  if (!chainConfigured) return null;
+  try {
+    return await publicClient.readContract({ address: MUSIC_CONTRACT, abi: musicWriteAbi, functionName: "editionsLeft", args: [BigInt(tokenId)] });
+  } catch { return null; }
+}
+
+/** Submit a primary buy WITHOUT waiting for the receipt. Returns the tx hash
+ *  immediately so callers can persist it before awaiting — a retry then
+ *  re-checks the same tx instead of buying again. */
+export async function submitBuy({ tokenId, qty, unitPriceWei }) {
   if (!deliveryConfigured) return { ok: false, reason: "delivery wallet not configured" };
-  if (!/^0x[0-9a-fA-F]{40}$/.test(to || "")) return { ok: false, reason: "bad recipient address" };
+  try {
+    const value = BigInt(unitPriceWei) * BigInt(qty);
+    const hash = await deliveryWallet.writeContract({
+      address: MUSIC_CONTRACT, abi: musicWriteAbi, functionName: "buy",
+      args: [BigInt(tokenId), BigInt(qty)], value,
+    });
+    return { ok: true, hash, paidWei: value.toString() };
+  } catch (e) {
+    return { ok: false, reason: String(e.shortMessage || e.message || e) };
+  }
+}
+
+/** Await a submitted tx. Returns { ok, status: success|reverted|pending }. */
+export async function waitReceipt(hash, timeoutMs = 60_000) {
+  if (!chainConfigured) return { ok: false, status: "pending", reason: "chain not configured" };
+  try {
+    const rc = await publicClient.waitForTransactionReceipt({ hash, timeout: timeoutMs });
+    return { ok: rc.status === "success", status: rc.status === "success" ? "success" : "reverted" };
+  } catch (e) {
+    // timeout / not-yet-mined — caller should retry later, NOT re-submit
+    return { ok: false, status: "pending", reason: String(e.shortMessage || e.message || e) };
+  }
+}
+
+/**
+ * Buy `qty` editions of `tokenId` on the primary market with the platform
+ * delivery wallet (paying `unitPriceWei` each). The editions stay in the
+ * delivery wallet — used both as step 1 of direct delivery and as the "hold"
+ * step for guest card buyers who claim to a wallet later.
+ */
+export async function buyEditions({ tokenId, qty, unitPriceWei }) {
+  if (!deliveryConfigured) return { ok: false, reason: "delivery wallet not configured" };
   try {
     const value = BigInt(unitPriceWei) * BigInt(qty);
     const buyTx = await deliveryWallet.writeContract({
@@ -110,18 +151,40 @@ export async function buyAndDeliver({ tokenId, qty, unitPriceWei, to }) {
     });
     const buyRcpt = await publicClient.waitForTransactionReceipt({ hash: buyTx });
     if (buyRcpt.status !== "success") return { ok: false, reason: "on-chain buy reverted", buyTx };
+    return { ok: true, buyTx, paidWei: value.toString() };
+  } catch (e) {
+    return { ok: false, reason: String(e.shortMessage || e.message || e) };
+  }
+}
 
+/** Transfer `qty` editions of `tokenId` from the delivery wallet to `to`. */
+export async function transferEditions({ tokenId, qty, to }) {
+  if (!deliveryConfigured) return { ok: false, reason: "delivery wallet not configured" };
+  if (!/^0x[0-9a-fA-F]{40}$/.test(to || "")) return { ok: false, reason: "bad recipient address" };
+  try {
     const transferTx = await deliveryWallet.writeContract({
       address: MUSIC_CONTRACT, abi: musicWriteAbi, functionName: "safeTransferFrom",
       args: [deliveryAccount.address, to, BigInt(tokenId), BigInt(qty), "0x"],
     });
     const xferRcpt = await publicClient.waitForTransactionReceipt({ hash: transferTx });
-    if (xferRcpt.status !== "success") return { ok: false, reason: "delivery transfer reverted", buyTx, transferTx };
-
-    return { ok: true, buyTx, transferTx, paidWei: value.toString() };
+    if (xferRcpt.status !== "success") return { ok: false, reason: "delivery transfer reverted", transferTx };
+    return { ok: true, transferTx };
   } catch (e) {
     return { ok: false, reason: String(e.shortMessage || e.message || e) };
   }
+}
+
+/**
+ * Fulfil a fiat order end-to-end: buy then transfer to the customer wallet.
+ * Returns { ok, buyTx, transferTx, paidWei } or { ok:false, reason }.
+ */
+export async function buyAndDeliver({ tokenId, qty, unitPriceWei, to }) {
+  if (!/^0x[0-9a-fA-F]{40}$/.test(to || "")) return { ok: false, reason: "bad recipient address" };
+  const bought = await buyEditions({ tokenId, qty, unitPriceWei });
+  if (!bought.ok) return bought;
+  const moved = await transferEditions({ tokenId, qty, to });
+  if (!moved.ok) return { ...moved, buyTx: bought.buyTx };
+  return { ok: true, buyTx: bought.buyTx, transferTx: moved.transferTx, paidWei: bought.paidWei };
 }
 
 /**
