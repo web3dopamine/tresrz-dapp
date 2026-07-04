@@ -93,6 +93,9 @@ export default function TrackPage() {
   const [xferQty, setXferQty] = useState("1");
   // inline edit of one of your own listings: null = closed
   const [editListing, setEditListing] = useState<{ id: number; qty: string; price: string } | null>(null);
+  // opensea-style layout state: right-column tab + inline make-offer form
+  const [tab, setTab] = useState<"details" | "orders" | "activity">("details");
+  const [showOffer, setShowOffer] = useState(false);
 
   function toast(m: string) { setMsg(m); clearTimeout(tRef.current); tRef.current = setTimeout(() => setMsg(""), 2400); }
 
@@ -293,6 +296,13 @@ export default function TrackPage() {
     () => history.map((h) => Number(ethStr(h.unitWei, 6))).filter((n) => Number.isFinite(n)),
     [history],
   );
+  // opensea-style stat strip: best open offer + most recent sale price
+  const topOffer = useMemo(
+    () => offers.reduce<bigint | null>((m, o) => (m === null || o.unit > m ? o.unit : m), null),
+    [offers],
+  );
+  const lastSale = history.length ? history[history.length - 1].unitWei : null;
+  const ordersCount = listings.length + offers.length;
 
   return (
     <div className="wrap">
@@ -303,94 +313,137 @@ export default function TrackPage() {
           <div className="muted-note">Track not found. <Link href="/" style={{ color: "var(--crimson-soft)" }}>← Back home</Link></div>
         )}
         {state === "ready" && track && (
-          <>
-            <div className="detail-grid">
+          <div className="os-grid">
+            {/* ---- left: sticky media (cover + player) ---- */}
+            <div className="os-media">
               <div className="detail-cover">
                 <CoverArt seed={track.coverSeed} />
                 <div className="genre">{track.genre}</div>
               </div>
+              <WaveformPlayer track={track} />
+            </div>
 
-              <div className="detail-info">
-                <h1 className="detail-title">{track.title}</h1>
+            {/* ---- right: info column ---- */}
+            <div className="os-info">
+              <h1 className="detail-title">{track.title}</h1>
+              <div className="os-byline">
                 <Link href={`/artist/${track.artist.address}`} className="detail-artist">
                   <img src={avatarUrl(track.artist.avatarSeed)} alt="" />
                   <span>by <b>{track.artist.handle}</b></span>
                 </Link>
+                {ownedQty > 0 && <span className="os-owned">YOU OWN {ownedQty}</span>}
+              </div>
+              <div className="os-chips">
+                <span>ERC-1155</span>
+                <span>{CHAIN_ID === 11155111 ? "SEPOLIA" : CHAIN_ID === 1 ? "ETHEREUM" : "LIBERTY"}</span>
+                <span>TOKEN #{track.chainTokenId ?? "—"}</span>
+                <span>{track.genre}</span>
+              </div>
 
-                <div className="detail-stats">
-                  <div><span>PRICE</span><b>{priceEth.toFixed(3)} ETH</b></div>
-                  <div><span>EDITIONS LEFT</span><b>{track.left} / {track.maxSupply}</b></div>
-                  <div><span>TOKEN ID</span><b>{track.chainTokenId ?? "—"}</b></div>
-                  <div><span>YOU OWN</span><b>{ownedQty}</b></div>
-                </div>
+              {/* stat strip: top offer / last sale / left / royalty */}
+              <div className="os-statbar">
+                <div><span>TOP OFFER</span><b>{topOffer !== null ? `${ethStr(topOffer)} ETH` : "—"}</b></div>
+                <div><span>LAST SALE</span><b>{lastSale ? `${ethStr(lastSale)} ETH` : "—"}</b></div>
+                <div><span>EDITIONS LEFT</span><b>{track.left} / {track.maxSupply}</b></div>
+                <div><span>ROYALTY</span><b>{chainInfo?.royaltyPct != null ? `${chainInfo.royaltyPct}%` : "—"}</b></div>
+              </div>
 
-                <WaveformPlayer track={track} />
-
-                <div className="detail-actions">
-                  <button className="buy" disabled={busy || track.left === 0} onClick={onBuy}>
-                    {track.left === 0 ? "SOLD OUT" : busy ? "CONFIRMING…" : `BUY 1 EDITION · ${priceEth.toFixed(3)} ETH`}
+              {/* buy panel */}
+              <div className="os-buybox">
+                <span className="os-buy-label">BUY FOR</span>
+                <div className="os-price">{priceEth.toFixed(3)} <small>ETH</small></div>
+                <div className="os-buy-actions">
+                  <button className="buy os-buynow" disabled={busy || track.left === 0} onClick={onBuy}>
+                    {track.left === 0 ? "SOLD OUT" : busy ? "CONFIRMING…" : "BUY NOW"}
+                  </button>
+                  <button
+                    className="os-makeoffer"
+                    disabled={chainTokenId == null}
+                    onClick={() => setShowOffer((v) => !v)}
+                  >
+                    {showOffer ? "CLOSE" : "MAKE OFFER"}
                   </button>
                   <button className={`heart detail-heart${track.liked ? " liked" : ""}`} disabled={liking} onClick={onLike} aria-label="like">
                     <svg viewBox="0 0 24 24"><path d="M12 21s-7-4.5-9.5-8.5C1 9 3 5.5 6.5 5.5c2 0 3.5 1.3 5.5 3 2-1.7 3.5-3 5.5-3C21 5.5 23 9 21.5 12.5 19 16.5 12 21 12 21z" /></svg>
                     <small>{track.likes}</small>
                   </button>
                 </div>
-              </div>
-            </div>
-
-            {/* ---- On-chain provenance ---- */}
-            <div className="sec-title" style={{ marginTop: 34 }}>ON-CHAIN</div>
-            <div className="sec-bar" />
-            {chainTokenId == null ? (
-              <div className="muted-note">This track isn’t on-chain yet.</div>
-            ) : (
-              <div className="tk-panel">
-                <ul className="tk-onchain">
-                  <li><span>Contract</span><a href={`${EXPLORER}/address/${MUSIC_CONTRACT}`} target="_blank" rel="noreferrer">{shortAddr(MUSIC_CONTRACT)} ↗</a></li>
-                  <li><span>Token ID</span><a href={`${EXPLORER}/token/${MUSIC_CONTRACT}?a=${chainTokenId}`} target="_blank" rel="noreferrer">#{chainTokenId} ↗</a></li>
-                  {chainInfo && <li><span>Editions minted</span><b>{chainInfo.minted} / {chainInfo.maxSupply}</b></li>}
-                  {chainInfo && <li><span>Creator</span><Link href={`/artist/${chainInfo.artist}`}>{shortAddr(chainInfo.artist)}</Link></li>}
-                  {chainInfo?.royaltyPct != null && <li><span>Royalty</span><b>{chainInfo.royaltyPct}%</b></li>}
-                  {track.createdAt && <li><span>Minted</span><b>{new Date(track.createdAt).toLocaleString()}</b></li>}
-                  {track.txHash && <li><span>Mint tx</span><a href={`${EXPLORER}/tx/${track.txHash}`} target="_blank" rel="noreferrer">{track.txHash.slice(0, 10)}… ↗</a></li>}
-                  {chainInfo && <li><span>Status</span><b>{chainInfo.active ? "Active" : "Inactive"}</b></li>}
-                </ul>
-                <a className="tk-explorer-link" href={`${EXPLORER}/token/${MUSIC_CONTRACT}?a=${chainTokenId}`} target="_blank" rel="noreferrer">
-                  View mint &amp; full transfer history on {EXPLORER_NAME} ↗
-                </a>
-              </div>
-            )}
-
-            {/* ---- Price history ---- */}
-            <div className="sec-title" style={{ marginTop: 34 }}>PRICE HISTORY</div>
-            <div className="sec-bar" />
-            {history.length === 0 ? (
-              <div className="muted-note">No sales recorded yet.</div>
-            ) : (
-              <div className="tk-panel">
-                {sparkPoints.length >= 2 && (
-                  <div className="tk-spark"><Sparkline points={sparkPoints} /><span>unit price trend (ETH)</span></div>
+                {showOffer && (
+                  <div className="tk-row os-offer-row">
+                    <input type="number" min={1} step={1} value={offerQty} onChange={(e) => setOfferQty(e.target.value)} placeholder="qty" />
+                    <input type="number" min={0} step="0.001" value={offerPrice} onChange={(e) => setOfferPrice(e.target.value)} placeholder="ETH / unit" />
+                    <button className="buy tk-mini" disabled={offering} onClick={onMakeOffer}>{offering ? "…" : "SUBMIT OFFER"}</button>
+                  </div>
                 )}
-                <ul className="tk-history">
-                  {history.map((h, i) => (
-                    <li key={i}>
-                      <span className={`tk-kind tk-${h.kind === "secondary" ? "sec" : "pri"}`}>{h.kind}</span>
-                      <span className="tk-qty">×{h.qty}</span>
-                      <span className="tk-price">{ethStr(h.unitWei)} ETH</span>
-                      <span className="tk-date">{new Date(h.at).toLocaleDateString()}</span>
-                    </li>
-                  ))}
-                </ul>
               </div>
-            )}
 
-            {/* ---- Secondary market ---- */}
-            <div className="sec-title" style={{ marginTop: 34 }}>SECONDARY MARKET</div>
-            <div className="sec-bar" />
-            {chainTokenId == null ? (
-              <div className="muted-note">This track isn’t on-chain yet, so it can’t be traded.</div>
-            ) : (
-              <div className="tk-panel">
+              {/* tabs: details / orders / activity */}
+              <div className="os-tabs" role="tablist">
+                <button role="tab" aria-selected={tab === "details"} className={`os-tab${tab === "details" ? " active" : ""}`} onClick={() => setTab("details")}>DETAILS</button>
+                <button role="tab" aria-selected={tab === "orders"} className={`os-tab${tab === "orders" ? " active" : ""}`} onClick={() => setTab("orders")}>ORDERS{ordersCount > 0 ? ` (${ordersCount})` : ""}</button>
+                <button role="tab" aria-selected={tab === "activity"} className={`os-tab${tab === "activity" ? " active" : ""}`} onClick={() => setTab("activity")}>ACTIVITY{history.length > 0 ? ` (${history.length})` : ""}</button>
+              </div>
+
+              {/* ---- DETAILS tab: traits grid + on-chain list ---- */}
+              {tab === "details" && (
+                <>
+                  <div className="os-traits">
+                    <div className="os-trait"><span>GENRE</span><b>{track.genre}</b></div>
+                    <div className="os-trait"><span>EDITION SIZE</span><b>{track.maxSupply}</b></div>
+                    <div className="os-trait"><span>MINTED</span><b>{track.minted}</b></div>
+                    <div className="os-trait"><span>ROYALTY</span><b>{chainInfo?.royaltyPct != null ? `${chainInfo.royaltyPct}%` : "—"}</b></div>
+                    <div className="os-trait"><span>FULL AUDIO</span><b>{track.hasFullAudio ? "TOKEN-GATED" : "—"}</b></div>
+                    <div className="os-trait"><span>STATUS</span><b>{chainInfo ? (chainInfo.active ? "ACTIVE" : "INACTIVE") : "—"}</b></div>
+                  </div>
+                  {chainTokenId == null ? (
+                    <div className="muted-note">This track isn’t on-chain yet.</div>
+                  ) : (
+                    <div className="tk-panel os-panel">
+                      <ul className="tk-onchain">
+                        <li><span>Contract</span><a href={`${EXPLORER}/address/${MUSIC_CONTRACT}`} target="_blank" rel="noreferrer">{shortAddr(MUSIC_CONTRACT)} ↗</a></li>
+                        <li><span>Token ID</span><a href={`${EXPLORER}/token/${MUSIC_CONTRACT}?a=${chainTokenId}`} target="_blank" rel="noreferrer">#{chainTokenId} ↗</a></li>
+                        <li><span>Token standard</span><b>ERC-1155</b></li>
+                        {chainInfo && <li><span>Creator</span><Link href={`/artist/${chainInfo.artist}`}>{shortAddr(chainInfo.artist)}</Link></li>}
+                        {track.createdAt && <li><span>Minted</span><b>{new Date(track.createdAt).toLocaleString()}</b></li>}
+                        {track.txHash && <li><span>Mint tx</span><a href={`${EXPLORER}/tx/${track.txHash}`} target="_blank" rel="noreferrer">{track.txHash.slice(0, 10)}… ↗</a></li>}
+                      </ul>
+                      <a className="tk-explorer-link" href={`${EXPLORER}/token/${MUSIC_CONTRACT}?a=${chainTokenId}`} target="_blank" rel="noreferrer">
+                        View mint &amp; full transfer history on {EXPLORER_NAME} ↗
+                      </a>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* ---- ACTIVITY tab: price history ---- */}
+              {tab === "activity" && (
+                history.length === 0 ? (
+                  <div className="muted-note">No sales recorded yet.</div>
+                ) : (
+                  <div className="tk-panel os-panel">
+                    {sparkPoints.length >= 2 && (
+                      <div className="tk-spark"><Sparkline points={sparkPoints} /><span>unit price trend (ETH)</span></div>
+                    )}
+                    <ul className="tk-history">
+                      {history.map((h, i) => (
+                        <li key={i}>
+                          <span className={`tk-kind tk-${h.kind === "primary" ? "pri" : "sec"}`}>{h.kind.replace("secondary_", "")}</span>
+                          <span className="tk-qty">×{h.qty}</span>
+                          <span className="tk-price">{ethStr(h.unitWei)} ETH</span>
+                          <span className="tk-date">{new Date(h.at).toLocaleDateString()}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )
+              )}
+
+              {/* ---- ORDERS tab: listings + offers + owner forms ---- */}
+              {tab === "orders" && (chainTokenId == null ? (
+                <div className="muted-note">This track isn’t on-chain yet, so it can’t be traded.</div>
+              ) : (
+                <div className="tk-panel os-panel">
+                  <h4 className="os-sub">LISTINGS</h4>
                 {listings.length === 0 ? (
                   <div className="muted-note">No active listings for this token.</div>
                 ) : (
@@ -489,15 +542,6 @@ export default function TrackPage() {
                   )}
                 </div>
 
-                <div className="tk-form">
-                  <h4>MAKE AN OFFER</h4>
-                  <div className="tk-row">
-                    <input type="number" min={1} step={1} value={offerQty} onChange={(e) => setOfferQty(e.target.value)} placeholder="qty" />
-                    <input type="number" min={0} step="0.001" value={offerPrice} onChange={(e) => setOfferPrice(e.target.value)} placeholder="ETH / unit" />
-                    <button className="buy tk-mini" disabled={offering} onClick={onMakeOffer}>{offering ? "…" : "OFFER"}</button>
-                  </div>
-                </div>
-
                 {ownedQty > 0 && (
                   <>
                     <div className="tk-form">
@@ -518,14 +562,55 @@ export default function TrackPage() {
                     </div>
                   </>
                 )}
-              </div>
-            )}
-          </>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </section>
       <div className={`toast${msg ? " show" : ""}`}>{msg}</div>
 
       <style jsx>{`
+        /* ---- opensea-style two-column item layout ---- */
+        .os-grid { display: grid; grid-template-columns: minmax(320px, 460px) 1fr; gap: 36px; align-items: start; }
+        .os-media { position: sticky; top: 86px; display: flex; flex-direction: column; }
+        .os-info { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+        .os-byline { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+        .os-owned { font-family: var(--mono, monospace); font-size: 10px; font-weight: 700; letter-spacing: 1px; color: var(--crimson-soft, #ffa052); border: 1px solid var(--card-line); border-radius: 14px; padding: 4px 10px; }
+        .os-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+        .os-chips span { font-family: var(--mono, monospace); font-size: 10px; font-weight: 700; letter-spacing: 1px; color: var(--muted, #bec0c2); background: var(--panel-bg); border: 1px solid var(--card-line); border-radius: 4px; padding: 5px 9px; }
+        .os-statbar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; background: var(--card-grad); border: 1px solid var(--card-line); border-radius: 12px; padding: 14px 4px; }
+        .os-statbar > div { display: flex; flex-direction: column; gap: 4px; padding: 0 14px; border-right: 1px solid var(--line-soft); min-width: 0; }
+        .os-statbar > div:last-child { border-right: none; }
+        .os-statbar span { font-family: var(--mono, monospace); font-size: 9px; letter-spacing: 1.2px; color: var(--muted, #bec0c2); white-space: nowrap; }
+        .os-statbar b { font-size: 14px; color: var(--ink, #fff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .os-buybox { background: var(--card-grad); border: 1px solid var(--card-line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+        .os-buy-label { font-family: var(--mono, monospace); font-size: 10px; letter-spacing: 1.5px; color: var(--muted, #bec0c2); }
+        .os-price { font-family: var(--display, sans-serif); font-size: 40px; line-height: 1; color: var(--ink, #fff); letter-spacing: 1px; }
+        .os-price small { font-family: var(--mono, monospace); font-size: 15px; color: var(--muted, #bec0c2); letter-spacing: 0; }
+        .os-buy-actions { display: flex; align-items: stretch; gap: 10px; margin-top: 4px; flex-wrap: wrap; }
+        .os-buynow { flex: 2 1 160px; padding: 14px 20px; font-size: 13px; margin-top: 0; }
+        .os-makeoffer { flex: 1 1 120px; font-family: var(--mono, monospace); font-weight: 700; font-size: 12px; letter-spacing: 1.5px; color: var(--ink, #fff); background: transparent; border: 1.5px solid var(--card-line); border-radius: 4px; padding: 14px 16px; cursor: pointer; transition: .2s; }
+        .os-makeoffer:hover:not(:disabled) { border-color: var(--crimson, #f58426); box-shadow: var(--glow); }
+        .os-makeoffer:disabled { opacity: .5; cursor: not-allowed; }
+        .os-offer-row { margin-top: 6px; }
+        .os-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-top: 6px; }
+        .os-tab { font-family: var(--mono, monospace); font-weight: 700; font-size: 12px; letter-spacing: 1.5px; color: var(--muted, #bec0c2); background: none; border: none; border-bottom: 2.5px solid transparent; padding: 11px 14px; cursor: pointer; transition: .2s; }
+        .os-tab:hover { color: var(--ink, #fff); }
+        .os-tab.active { color: var(--ink, #fff); border-bottom-color: var(--crimson, #f58426); }
+        .os-traits { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+        .os-trait { background: var(--panel-bg); border: 1px solid var(--card-line); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+        .os-trait span { font-family: var(--mono, monospace); font-size: 9px; letter-spacing: 1.2px; color: var(--crimson-soft, #ffa052); }
+        .os-trait b { font-size: 13px; color: var(--ink, #fff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .os-panel { margin-top: 0; }
+        .os-sub { font-family: var(--mono, monospace); font-size: 11px; letter-spacing: .08em; color: var(--muted, #bec0c2); margin: 0 0 8px; text-transform: uppercase; }
+        @media (max-width: 900px) {
+          .os-grid { grid-template-columns: 1fr; gap: 22px; }
+          .os-media { position: static; }
+          .os-statbar { grid-template-columns: repeat(2, 1fr); row-gap: 14px; }
+          .os-statbar > div:nth-child(2) { border-right: none; }
+          .os-price { font-size: 32px; }
+        }
         .tk-panel { background: var(--card-grad); border: 1px solid var(--card-line, rgba(245,132,38,.25)); border-radius: 12px; padding: 18px; margin-top: 6px; }
         .tk-spark { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
         .tk-spark span { font-family: var(--mono, monospace); font-size: 11px; color: var(--muted, #bec0c2); }
