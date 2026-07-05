@@ -99,7 +99,9 @@ export const api = {
   // custodial (wallet-less) minting + creator dashboard
   custodialStatus: (): Promise<{ enabled: boolean }> => req(`/api/mint/status`),
   custodialMint: (form: FormData): Promise<{ trackId: string; txHash?: string; status: string }> => {
-    return fetch(`${BASE}/api/mint/custodial`, { method: "POST", body: form }).then(async (r) => {
+    // publish is auth-gated (requireAuth) — send the bearer token. Don't set
+    // Content-Type; the browser adds the multipart boundary for FormData.
+    return fetch(`${BASE}/api/mint/custodial`, { method: "POST", headers: { ...authHeaders() }, body: form }).then(async (r) => {
       if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error || r.statusText);
       return r.json();
     });
