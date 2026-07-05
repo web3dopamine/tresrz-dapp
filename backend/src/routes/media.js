@@ -1,0 +1,55 @@
+import { Router } from "express";
+import { prisma } from "../db.js";
+
+// Serves the raw uploaded bytes stored in TrackMedia so a freshly-published
+// track is playable/visible on the frontend instantly — no wait for IPFS or the
+// on-chain mint. Supports HTTP Range requests so <audio> can stream and seek.
+const r = Router();
+
+function sendBytes(req, res, buf, mime) {
+  const total = buf.length;
+  res.setHeader("Content-Type", mime || "application/octet-stream");
+  res.setHeader("Accept-Ranges", "bytes");
+  res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+  const range = req.headers.range;
+  if (range) {
+    const m = /bytes=(\d*)-(\d*)/.exec(range);
+    let start = m && m[1] ? parseInt(m[1], 10) : 0;
+    let end = m && m[2] ? parseInt(m[2], 10) : total - 1;
+    if (!Number.isFinite(start) || start < 0) start = 0;
+    if (!Number.isFinite(end) || end >= total) end = total - 1;
+    if (start > end) {
+      res.status(416).setHeader("Content-Range", `bytes */${total}`).end();
+      return;
+    }
+    res.status(206);
+    res.setHeader("Content-Range", `bytes ${start}-${end}/${total}`);
+    res.setHeader("Content-Length", end - start + 1);
+    res.end(buf.subarray(start, end + 1));
+  } else {
+    res.setHeader("Content-Length", total);
+    res.end(buf);
+  }
+}
+
+// GET /api/media/:id/audio
+r.get("/:id/audio", async (req, res) => {
+  const m = await prisma.trackMedia.findUnique({
+    where: { trackId: req.params.id },
+    select: { audioData: true, audioMime: true },
+  });
+  if (!m?.audioData) return res.status(404).json({ error: "no audio" });
+  sendBytes(req, res, Buffer.from(m.audioData), m.audioMime || "audio/mpeg");
+});
+
+// GET /api/media/:id/cover
+r.get("/:id/cover", async (req, res) => {
+  const m = await prisma.trackMedia.findUnique({
+    where: { trackId: req.params.id },
+    select: { imageData: true, imageMime: true },
+  });
+  if (!m?.imageData) return res.status(404).json({ error: "no cover" });
+  sendBytes(req, res, Buffer.from(m.imageData), m.imageMime || "image/jpeg");
+});
+
+export default r;

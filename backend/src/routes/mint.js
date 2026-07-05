@@ -81,9 +81,22 @@ r.post("/custodial", requireAuth, upload.fields([{ name: "audio", maxCount: 1 },
     const track = await prisma.track.create({
       data: {
         title: title.slice(0, 120), genre: genre.slice(0, 40), maxSupply, priceWei,
-        coverSeed, audioUrl: null, audioCid: null, coverUrl: null, metadataUri: null,
+        coverSeed, audioCid: null, metadataUri: null,
         mime: audio.mimetype, chainTokenId: null, txHash: null, mintTx: null,
         mintStatus: "publishing", custodial: true, artistId: creator.id,
+        // store the raw bytes so the track is served + playable from our DB instantly
+        media: { create: {
+          audioData: audio.buffer, audioMime: audio.mimetype,
+          imageData: image?.buffer || null, imageMime: image?.mimetype || null,
+        } },
+      },
+    });
+    // point preview/cover at the DB-backed media route (available immediately)
+    await prisma.track.update({
+      where: { id: track.id },
+      data: {
+        audioUrl: `/api/media/${track.id}/audio`,
+        coverUrl: image ? `/api/media/${track.id}/cover` : null,
       },
     });
 
@@ -137,10 +150,12 @@ async function finalizePublish(trackId, x) {
       return s;
     });
 
+    // NOTE: keep audioUrl/coverUrl pointing at our DB-backed media route (fast,
+    // reliable, same-origin). IPFS is only recorded for the on-chain metadata.
     await prisma.track.update({
       where: { id: trackId },
       data: {
-        audioUrl: audioPin.url || null, audioCid: audioPin.cid || null, coverUrl: imagePin?.url || null,
+        audioCid: audioPin.cid || null,
         metadataUri, txHash: sub.hash, mintTx: sub.hash, mintStatus: "minting",
       },
     });

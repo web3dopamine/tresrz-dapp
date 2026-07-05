@@ -42,8 +42,10 @@ const shape = (t, userId) => ({
 // GET /api/tracks?hot=true&genre=HOUSE&limit=10
 r.get("/", optionalAuth, async (req, res) => {
   const { hot, genre, limit, q } = req.query;
-  // hide moderated tracks, moderated users, and tracks still confirming on-chain
-  const where = { flagged: false, artist: { flagged: false }, mintStatus: "active" };
+  // hide moderated tracks + users and failed publishes; show live tracks plus ones
+  // still finalizing in the background (publishing/minting) so a fresh publish
+  // appears on the marketplace instantly (buying is gated until it's on-chain).
+  const where = { flagged: false, artist: { flagged: false }, mintStatus: { in: ["active", "minting", "publishing"] } };
   if (hot === "true") where.hot = true;
   if (genre) where.genre = String(genre).toUpperCase();
   if (q) {
@@ -86,7 +88,7 @@ r.get("/trending", optionalAuth, async (req, res) => {
   }
 
   const tracks = await prisma.track.findMany({
-    where: { flagged: false, artist: { flagged: false }, mintStatus: "active" },
+    where: { flagged: false, artist: { flagged: false }, mintStatus: { in: ["active", "minting", "publishing"] } },
     include: { artist: true, _count: { select: { likes: true } }, likes: req.user ? { where: { userId: req.user.id } } : false },
   });
 

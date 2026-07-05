@@ -13,6 +13,7 @@ import adminRoutes from "./routes/admin.js";
 import rateRoutes from "./routes/rate.js";
 import fiatRoutes, { fiatWebhook, startFiatReconciler } from "./routes/fiat.js";
 import mintRoutes, { startMintReconciler } from "./routes/mint.js";
+import mediaRoutes from "./routes/media.js";
 import { UPLOAD_DIR } from "./ipfs.js";
 
 // Fail fast: a missing/placeholder JWT_SECRET means every token is forgeable.
@@ -66,6 +67,10 @@ app.get("/health", (_req, res) => res.json({ ok: true, service: "tresrz-api" }))
 
 // Serve locally-stored uploads (IPFS fallback when PINATA_JWT is unset).
 app.use("/uploads", express.static(UPLOAD_DIR));
+
+// DB-backed media (audio/cover). Mounted BEFORE the API rate limiter so audio
+// Range streaming isn't throttled. Its own long cache headers keep load low.
+app.use("/api/media", mediaRoutes);
 
 app.use("/api", apiLimiter);
 app.use("/api/auth", strictLimiter, authRoutes);

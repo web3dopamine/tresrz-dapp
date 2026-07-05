@@ -106,7 +106,7 @@ export default function MintPage() {
 
             {status === "done" && created && (
               <div className="mint-ok">
-                ✓ Published! Finalizing on-chain (~30s) — it goes fully live automatically. <Link href={`/track/${created.id}`}>View track →</Link>
+                ✓ Published! Your track is live on the marketplace. <Link href={`/track/${created.id}`}>View track →</Link>
               </div>
             )}
           </form>
