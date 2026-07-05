@@ -91,16 +91,12 @@ export const api = {
 
   // custodial (wallet-less) minting + creator dashboard
   custodialStatus: (): Promise<{ enabled: boolean }> => req(`/api/mint/status`),
-  custodialMint: (form: FormData): Promise<{ trackId: string; chainTokenId: number; txHash: string; manageToken: string; creatorId: string }> => {
+  custodialMint: (form: FormData): Promise<{ trackId: string; chainTokenId: number; txHash: string }> => {
     return fetch(`${BASE}/api/mint/custodial`, { method: "POST", body: form }).then(async (r) => {
       if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error || r.statusText);
       return r.json();
     });
   },
-  creatorMe: (token: string): Promise<{ creator: { id: string; email: string; handle: string | null; avatarSeed: number }; balanceWei: string; tracks: Array<{ id: string; title: string; genre: string; coverSeed: number; chainTokenId: number | null; priceWei: string; maxSupply: number; minted: number; left: number; likes: number; sales: number; flagged: boolean }> }> =>
-    req(`/api/creator/me?token=${encodeURIComponent(token)}`),
-  creatorWithdraw: (b: { token: string; address: string }): Promise<{ ok: boolean; txHash: string; amountWei: string; toAddress: string }> =>
-    req(`/api/creator/withdraw`, { method: "POST", body: JSON.stringify(b) }),
 
   // M4: admin
   adminStats: (): Promise<AdminStats> => req(`/api/admin/stats`),

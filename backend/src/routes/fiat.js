@@ -6,7 +6,6 @@ import {
   submitBuy, waitReceipt, transferEditions, editionsLeft, deliveryBalanceOf, deliveryConfigured,
 } from "../chain.js";
 import { usdPerEth } from "./rate.js";
-import { creditEarningsTx, artistShareWei } from "./creator.js";
 
 // Stripe card checkout for primary NFT purchases (US customers pay USD).
 //
@@ -164,19 +163,10 @@ async function finalizeDelivered(order, to, deliverTx) {
     where: { id: order.id },
     data: { status: "delivered", deliveredTo: to, deliverTx, deliveredAt: new Date() },
   });
-  // record the sale + credit a custodial creator atomically (idempotent on the
-  // unique txHash; a P2002 retry rolls back and won't double-credit). paidWei is
-  // the on-chain ETH the delivery wallet spent — trustworthy for accounting.
-  try {
-    await prisma.$transaction(async (tx) => {
-      await tx.sale.create({
-        data: { trackId: order.trackId, buyerId: user.id, kind: "fiat_primary", qty: order.qty, priceWei: order.paidWei, txHash: deliverTx, stripeSessionId: order.stripeSessionId },
-      });
-      await creditEarningsTx(tx, order.trackId, artistShareWei(order.paidWei));
-    });
-  } catch (e) {
-    if (e?.code !== "P2002") console.error("fiat sale record/credit failed:", order.stripeSessionId, e.message);
-  }
+  // record the sale for price history (idempotent on the unique txHash)
+  await prisma.sale.create({
+    data: { trackId: order.trackId, buyerId: user.id, kind: "fiat_primary", qty: order.qty, priceWei: order.paidWei, txHash: deliverTx, stripeSessionId: order.stripeSessionId },
+  }).catch((e) => { if (e?.code !== "P2002") console.error("fiat sale record failed:", order.stripeSessionId, e.message); });
 }
 
 async function refundOrder(order, reason) {

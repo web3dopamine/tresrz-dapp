@@ -13,7 +13,6 @@ import adminRoutes from "./routes/admin.js";
 import rateRoutes from "./routes/rate.js";
 import fiatRoutes, { fiatWebhook, startFiatReconciler } from "./routes/fiat.js";
 import mintRoutes from "./routes/mint.js";
-import creatorRoutes, { startPayoutReconciler } from "./routes/creator.js";
 import { UPLOAD_DIR } from "./ipfs.js";
 
 // Fail fast: a missing/placeholder JWT_SECRET means every token is forgeable.
@@ -80,7 +79,6 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/rate", rateRoutes);
 app.use("/api/fiat", strictLimiter, fiatRoutes);
 app.use("/api/mint", mintLimiter, mintRoutes);
-app.use("/api/creator", strictLimiter, creatorRoutes);
 
 // 404 + central error handler so a thrown/rejected handler returns JSON, never crashes.
 app.use((_req, res) => res.status(404).json({ error: "not found" }));
@@ -98,5 +96,4 @@ const port = process.env.PORT || 4000;
 app.listen(port, () => {
   console.log(`TRESRZ API on :${port}`);
   startFiatReconciler(); // heals card orders stuck by crashes/timeouts
-  startPayoutReconciler(); // finalizes/restores custodial withdrawals
 });
