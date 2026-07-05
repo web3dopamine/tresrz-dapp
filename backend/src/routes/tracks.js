@@ -89,21 +89,34 @@ r.get("/trending", optionalAuth, async (req, res) => {
     where: { flagged: false, artist: { flagged: false }, mintStatus: "active" },
     include: { artist: true, _count: { select: { likes: true } }, likes: req.user ? { where: { userId: req.user.id } } : false },
   });
+
+  // Freshly-minted tracks get a spot at the top of TRENDING so new creators get
+  // immediate visibility. A track counts as "new" for TRENDING_NEW_HOURS (default
+  // 24h) after it's created; within that band the newest sits highest. After the
+  // window it drops into the normal volume -> sales -> likes ranking.
+  const newMs = Number(process.env.TRENDING_NEW_HOURS || 24) * 3600e3;
+  const now = Date.now();
+
   const ranked = tracks
     .map((t) => {
       const a = agg.get(t.id) || { volume: 0n, count: 0 };
-      return { t, volume: a.volume, count: a.count };
+      const isNew = now - new Date(t.createdAt).getTime() < newMs;
+      return { t, volume: a.volume, count: a.count, isNew };
     })
     .sort((x, y) => {
+      if (x.isNew !== y.isNew) return x.isNew ? -1 : 1;                        // fresh mints first
+      if (x.isNew && y.isNew)                                                   // newest first within the fresh band
+        return new Date(y.t.createdAt).getTime() - new Date(x.t.createdAt).getTime();
       if (x.volume !== y.volume) return x.volume > y.volume ? -1 : 1;
       if (x.count !== y.count) return y.count - x.count;
       return (y.t._count?.likes ?? 0) - (x.t._count?.likes ?? 0);
     })
     .slice(0, Number(req.query.limit) || 10)
-    .map(({ t, volume, count }) => ({
+    .map(({ t, volume, count, isNew }) => ({
       ...shape(t, req.user?.id),
       windowVolumeWei: volume.toString(),
       windowSales: count,
+      isNew,
     }));
   res.json(ranked);
 });

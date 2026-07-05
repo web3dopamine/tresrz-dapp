@@ -193,7 +193,7 @@ export default function Home() {
               <span className="tt-track">
                 <span className="tt-cover"><CoverArt seed={t.coverSeed} /></span>
                 <span className="tt-name">
-                  <b>{t.title}</b>
+                  <b>{t.title}{(t as any).isNew && <span className="tt-new">NEW</span>}</b>
                   <small>{t.artist.handle} · {t.genre}</small>
                 </span>
               </span>

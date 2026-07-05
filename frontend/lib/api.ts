@@ -53,7 +53,7 @@ export type AdminStats = {
 export type AdminTrack = Track & { _count?: { likes: number; sales: number }; flagged: boolean };
 export type AdminUser = { id: string; address: string; handle: string | null; bio: string | null; flagged: boolean; createdAt: string; _count?: { tracks: number; sales: number } };
 
-export type TrendingTrack = Track & { windowVolumeWei: string; windowSales: number };
+export type TrendingTrack = Track & { windowVolumeWei: string; windowSales: number; isNew?: boolean };
 export type TrendWindow = "1h" | "1d" | "7d" | "all";
 
 export const api = {

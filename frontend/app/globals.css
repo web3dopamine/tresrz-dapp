@@ -376,6 +376,7 @@ a.trend-tr:hover{background:var(--panel-bg)}
 .tt-name{display:flex;flex-direction:column;min-width:0}
 .tt-name b{color:var(--ink);font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tt-name small{color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tt-new{display:inline-block;margin-left:7px;padding:1px 6px;border-radius:5px;background:var(--crimson,#f58426);color:#fff;font-size:9px;font-weight:800;letter-spacing:.05em;vertical-align:middle}
 .tt-num{font-family:var(--mono);font-size:13px;color:var(--ink);text-align:right;white-space:nowrap}
 .tt-num small{color:var(--muted);font-size:10px}
 .tt-likes{color:var(--crimson-soft)}
