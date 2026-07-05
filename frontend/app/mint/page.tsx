@@ -5,17 +5,19 @@ import Header from "@/components/Header";
 import { CoverArt } from "@/lib/art";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useUsdRate, fmtEth } from "@/lib/usd";
 
 type Status = "idle" | "minting" | "done" | "error";
 
 export default function MintPage() {
   const { token, openAuth } = useAuth();
+  const rate = useUsdRate();
   const [title, setTitle] = useState("");
   const [genre, setGenre] = useState("");
   const [description, setDescription] = useState("");
   const [artist, setArtist] = useState("");
   const [maxSupply, setMaxSupply] = useState("10");
-  const [price, setPrice] = useState("0.05");
+  const [price, setPrice] = useState("25"); // USD
   const [royalty, setRoyalty] = useState("5");
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -41,7 +43,7 @@ export default function MintPage() {
       fd.append("genre", genre.trim().toUpperCase());
       fd.append("description", description.trim());
       fd.append("maxSupply", String(Math.floor(Number(maxSupply))));
-      fd.append("priceEth", String(Number(price)));
+      fd.append("priceUsd", String(Number(price)));
       fd.append("royaltyPct", String(Number(royalty)));
       fd.append("coverSeed", String(coverSeed));
       if (artist.trim()) fd.append("handle", artist.trim());
@@ -56,7 +58,8 @@ export default function MintPage() {
     }
   }
 
-  const priceEth = Number(price) || 0;
+  const priceUsd = Number(price) || 0;
+  const priceEthEquiv = rate ? priceUsd / rate : 0;
 
   return (
     <div className="wrap">
@@ -82,7 +85,11 @@ export default function MintPage() {
             <label className="mint-field"><span>DESCRIPTION (OPTIONAL)</span><input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="A late-night synth journey…" maxLength={200} /></label>
             <div className="mint-row">
               <label className="mint-field"><span>MAX SUPPLY (EDITIONS)</span><input type="number" min={1} step={1} value={maxSupply} onChange={(e) => setMaxSupply(e.target.value)} /></label>
-              <label className="mint-field"><span>PRICE (ETH)</span><input type="number" min={0} step="any" value={price} onChange={(e) => setPrice(e.target.value)} /></label>
+              <label className="mint-field">
+                <span>PRICE (USD)</span>
+                <input type="number" min={0} step="any" value={price} onChange={(e) => setPrice(e.target.value)} />
+                {rate && priceUsd > 0 && <small className="mint-hint">≈ {fmtEth(BigInt(Math.round(priceEthEquiv * 1e18)).toString())} ETH on-chain</small>}
+              </label>
             </div>
             <label className="mint-field"><span>ROYALTY % (MAX 10)</span><input type="number" min={0} max={10} step="0.5" value={royalty} onChange={(e) => setRoyalty(e.target.value)} /></label>
             <label className="mint-field">
@@ -118,7 +125,7 @@ export default function MintPage() {
             {artist && <div className="mint-hint" style={{ marginBottom: 6 }}>by {artist}</div>}
             <div className="mint-pv-meta">
               <span>{Number(maxSupply) || 0} editions</span>
-              <span>{priceEth.toLocaleString(undefined, { maximumFractionDigits: 18 })} ETH</span>
+              <span>${priceUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
               <span>{Number(royalty) || 0}% royalty</span>
             </div>
           </div>

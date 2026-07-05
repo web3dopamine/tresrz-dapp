@@ -4,6 +4,7 @@ import { prisma } from "../db.js";
 import { requireAuth } from "../middleware/auth.js";
 import { pinFile, pinJSON, buildMetadata } from "../ipfs.js";
 import { platformMint, deliveryConfigured } from "../chain.js";
+import { usdPerEth } from "./rate.js";
 
 // Wallet-free minting. The creator just fills a form; the PLATFORM wallet mints
 // the track on-chain and is the on-chain artist, so 100% of crypto sale
@@ -34,7 +35,7 @@ r.post("/custodial", requireAuth, upload.fields([{ name: "audio", maxCount: 1 },
     const handle = String(b.handle || "").trim() || null;
     const description = String(b.description || "").trim();
     const maxSupply = Math.floor(Number(b.maxSupply));
-    const priceEth = Number(b.priceEth);
+    const priceUsd = Number(b.priceUsd);
     const royaltyPct = Number(b.royaltyPct);
     const coverSeed = Number(b.coverSeed) || Math.floor(Math.random() * 9999);
 
@@ -42,7 +43,7 @@ r.post("/custodial", requireAuth, upload.fields([{ name: "audio", maxCount: 1 },
     if (!title || title.length > 120) return res.status(400).json({ error: "title required (<=120 chars)" });
     if (!genre) return res.status(400).json({ error: "genre required" });
     if (!Number.isInteger(maxSupply) || maxSupply < 1 || maxSupply > 100000) return res.status(400).json({ error: "maxSupply must be 1..100000" });
-    if (!Number.isFinite(priceEth) || priceEth < 0) return res.status(400).json({ error: "price must be >= 0" });
+    if (!Number.isFinite(priceUsd) || priceUsd < 0) return res.status(400).json({ error: "price must be >= 0" });
     if (!Number.isFinite(royaltyPct) || royaltyPct < 0 || royaltyPct > 10) return res.status(400).json({ error: "royalty must be 0..10%" });
     const audio = req.files?.audio?.[0];
     if (!audio) return res.status(400).json({ error: "audio file required" });
@@ -50,6 +51,10 @@ r.post("/custodial", requireAuth, upload.fields([{ name: "audio", maxCount: 1 },
     const image = req.files?.image?.[0];
     if (image && !IMAGE_MIMES.includes(image.mimetype)) return res.status(415).json({ error: `unsupported image type ${image.mimetype}` });
 
+    // creator prices in USD; snapshot the on-chain price in wei at the live rate.
+    const rate = await usdPerEth();
+    if (!rate) return res.status(503).json({ error: "USD rate unavailable, try again in a moment" });
+    const priceEth = priceUsd / rate;
     const priceWei = BigInt(Math.round(priceEth * 1e18)).toString();
     const royaltyBps = Math.round(royaltyPct * 100);
 
