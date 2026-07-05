@@ -98,12 +98,26 @@ export const api = {
 
   // custodial (wallet-less) minting + creator dashboard
   custodialStatus: (): Promise<{ enabled: boolean }> => req(`/api/mint/status`),
-  custodialMint: (form: FormData): Promise<{ trackId: string; txHash?: string; status: string }> => {
-    // publish is auth-gated (requireAuth) — send the bearer token. Don't set
-    // Content-Type; the browser adds the multipart boundary for FormData.
-    return fetch(`${BASE}/api/mint/custodial`, { method: "POST", headers: { ...authHeaders() }, body: form }).then(async (r) => {
-      if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error || r.statusText);
-      return r.json();
+  custodialMint: (form: FormData, onProgress?: (pct: number) => void): Promise<{ trackId: string; txHash?: string; status: string }> => {
+    // XHR (not fetch) so we can report real upload progress — the audio upload is
+    // the only real wait. Auth-gated: send the bearer token; don't set
+    // Content-Type so the browser keeps the multipart boundary.
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${BASE}/api/mint/custodial`);
+      const t = typeof window !== "undefined" ? localStorage.getItem("tresrz_token") : null;
+      if (t) xhr.setRequestHeader("Authorization", `Bearer ${t}`);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () => {
+        let body: any = {};
+        try { body = JSON.parse(xhr.responseText); } catch {}
+        if (xhr.status >= 200 && xhr.status < 300) resolve(body);
+        else reject(new Error(body?.error || xhr.statusText || "Publish failed"));
+      };
+      xhr.onerror = () => reject(new Error("Network error during upload"));
+      xhr.send(form);
     });
   },
 

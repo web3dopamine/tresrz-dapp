@@ -5,6 +5,7 @@ import Header from "@/components/Header";
 import { CoverArt } from "@/lib/art";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import PublishCelebration from "@/components/PublishCelebration";
 
 type Status = "idle" | "minting" | "done" | "error";
 
@@ -24,6 +25,9 @@ export default function MintPage() {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
   const [created, setCreated] = useState<{ id: string } | null>(null);
+  const [progress, setProgress] = useState(0);        // upload %
+  const [celebrate, setCelebrate] = useState(false);  // congrats popup
+  const [firstTime, setFirstTime] = useState(false);
 
   const busy = status === "minting";
   const valid = useMemo(() => {
@@ -34,7 +38,7 @@ export default function MintPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!valid || busy) return;
-    setError(""); setCreated(null); setStatus("minting");
+    setError(""); setCreated(null); setProgress(0); setStatus("minting");
     try {
       const fd = new FormData();
       fd.append("title", title.trim());
@@ -47,9 +51,14 @@ export default function MintPage() {
       if (artist.trim()) fd.append("handle", artist.trim());
       fd.append("audio", audioFile!);
       if (imageFile) fd.append("image", imageFile);
-      const res = await api.custodialMint(fd);
+      const res = await api.custodialMint(fd, setProgress);
+      // first publish on this browser? -> special first-time celebration
+      const seen = typeof window !== "undefined" && localStorage.getItem("tresrz_published");
+      setFirstTime(!seen);
+      try { localStorage.setItem("tresrz_published", "1"); } catch {}
       setCreated({ id: res.trackId });
       setStatus("done");
+      setCelebrate(true);
     } catch (err: any) {
       setError(err?.message || "Publish failed");
       setStatus("error");
@@ -101,8 +110,11 @@ export default function MintPage() {
 
             {status === "error" && <div className="mint-err">{error}</div>}
             <button className="buy" type="submit" disabled={!valid || busy}>
-              {busy ? "PUBLISHING…" : "PUBLISH TRACK"}
+              {busy ? (progress < 100 ? `UPLOADING ${progress}%…` : "PUBLISHING…") : "PUBLISH TRACK"}
             </button>
+            {busy && (
+              <div className="mint-progress"><span style={{ width: `${Math.max(4, progress)}%` }} /></div>
+            )}
 
             {status === "done" && created && (
               <div className="mint-ok">
@@ -129,6 +141,10 @@ export default function MintPage() {
         </>
         )}
       </section>
+
+      {celebrate && created && (
+        <PublishCelebration trackId={created.id} firstTime={firstTime} onClose={() => setCelebrate(false)} />
+      )}
     </div>
   );
 }

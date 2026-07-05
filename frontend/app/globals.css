@@ -152,6 +152,28 @@ footer{margin-top:30px;border-top:1px solid var(--card-line);padding:40px 34px 6
 .mint-ok{color:#1f9d3a;font-size:13px;letter-spacing:.5px;text-align:center}
 .mint-ok a{color:var(--crimson-soft);font-weight:700;text-decoration:none}
 .mint-ok a:hover{text-decoration:underline}
+/* upload progress bar */
+.mint-progress{height:7px;border-radius:99px;background:rgba(31,58,138,.12);overflow:hidden;margin-top:-4px}
+.mint-progress span{display:block;height:100%;background:var(--crimson,#f58426);border-radius:99px;transition:width .2s ease}
+/* --- publish celebration popup + confetti --- */
+.pc-overlay{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:rgba(10,14,30,.55);backdrop-filter:blur(3px);animation:pc-fade .25s ease;overflow:hidden}
+@keyframes pc-fade{from{opacity:0}to{opacity:1}}
+.pc-card{position:relative;z-index:2;background:var(--panel-bg,#fff);border:2px solid var(--navy,#1f3a8a);border-radius:16px;padding:34px 30px 28px;max-width:420px;width:calc(100% - 40px);text-align:center;box-shadow:8px 8px 0 var(--navy,#1f3a8a);animation:pc-pop .45s cubic-bezier(.2,1.35,.4,1)}
+@keyframes pc-pop{from{transform:scale(.82);opacity:0}to{transform:scale(1);opacity:1}}
+.pc-close{position:absolute;top:12px;right:14px;background:none;border:none;color:var(--muted);font-size:15px;cursor:pointer;line-height:1}
+.pc-close:hover{color:var(--ink)}
+.pc-emoji{font-size:54px;line-height:1;margin-bottom:6px;animation:pc-bounce 1s ease infinite alternate}
+@keyframes pc-bounce{to{transform:translateY(-9px)}}
+.pc-card h2{font-family:var(--display,inherit);font-size:23px;color:var(--ink);margin:6px 0 10px;letter-spacing:.5px}
+.pc-card p{color:var(--muted);font-size:13px;line-height:1.55;margin:0 0 22px}
+.pc-actions{display:flex;flex-direction:column;gap:10px}
+.pc-view{width:100%;text-decoration:none;text-align:center}
+.pc-secondary{background:transparent;border:none;color:var(--muted);font-family:var(--mono,monospace);font-size:12px;cursor:pointer;padding:6px}
+.pc-secondary:hover{color:var(--ink)}
+.pc-confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1}
+.pc-confetti span{position:absolute;top:-24px;display:block;animation-name:pc-fall;animation-timing-function:linear;animation-iteration-count:1;animation-fill-mode:forwards}
+@keyframes pc-fall{0%{transform:translateY(-24px) rotateZ(0deg);opacity:1}100%{transform:translateY(105vh) rotateZ(720deg);opacity:.5}}
+@media(prefers-reduced-motion:reduce){.pc-confetti{display:none}.pc-emoji{animation:none}}
 .mint-preview{position:sticky;top:90px;background:var(--panel-bg);border:1px solid var(--card-line);border-radius:14px;padding:16px}
 .mint-cover{position:relative;width:100%;aspect-ratio:1/1;border-radius:10px;overflow:hidden}
 .mint-cover-actions{display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:11px;color:var(--muted)}
