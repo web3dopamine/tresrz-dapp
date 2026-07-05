@@ -10,7 +10,6 @@ import BuyModal from "@/components/BuyModal";
 import { CoverArt, avatarUrl } from "@/lib/art";
 import { api, type Track, type Artist, type TrendingTrack, type TrendWindow } from "@/lib/api";
 import { useUsdRate, usd } from "@/lib/usd";
-import { formatEther } from "viem";
 
 // Fallback demo data so the UI renders even before the backend/seed is up
 const DEMO_TRACKS: Track[] = [
@@ -28,14 +27,6 @@ const DEMO_ARTISTS: Artist[] = [
   ["BELLADONNA", 2, 13], ["The Same Persons", 2, 9], ["NERVOUSCAT", 14, 21], ["Renato Cantini", 2, 6], ["IDDQD", 2, 7],
   ["matlemad", 9, 14], ["Flower of Sound", 1, 5], ["Lego Flowers", 5, 10], ["Jaidem", 1, 8], ["Cappadonia", 1, 5],
 ].map(([h, n, l], i) => ({ id: `ar${i}`, handle: h as string, address: "0x0", avatarSeed: i * 137 + 3, nftCount: n as number, likes: l as number }));
-
-function eth(wei: string, dp = 2): string {
-  try {
-    const v = Number(formatEther(BigInt(wei)));
-    if (v > 0 && v < 0.01) return String(parseFloat(v.toPrecision(2))); // never round dust to "0.00"
-    return String(parseFloat(v.toFixed(dp)));
-  } catch { return "0"; }
-}
 
 export default function Home() {
   const [hot, setHot] = useState<Track[]>(DEMO_TRACKS);
@@ -109,7 +100,7 @@ export default function Home() {
               <div className="feat-info">
                 <h3>{t.title}</h3>
                 <p>
-                  <b>{usd(t.priceWei, rate) ?? `${eth(t.priceWei)} ETH`}</b>
+                  <b>{usd(t.priceWei, rate) ?? "…"}</b>
                   <span>· {t.left} of {t.maxSupply} left</span>
                 </p>
                 <em>by {t.artist.handle}</em>
@@ -198,11 +189,11 @@ export default function Home() {
                 </span>
               </span>
               <span className="tt-num">
-                <b>{usd(t.priceWei, rate) ?? `${eth(t.priceWei, 3)} ETH`}</b>
+                <b>{usd(t.priceWei, rate) ?? "…"}</b>
               </span>
               <span className="tt-num tt-vol">
                 {t.windowVolumeWei && t.windowVolumeWei !== "0"
-                  ? <><b>{usd(t.windowVolumeWei, rate) ?? `${eth(t.windowVolumeWei, 4)} ETH`}</b> <small>{t.windowSales} sale{(t.windowSales ?? 0) !== 1 ? "s" : ""}</small></>
+                  ? <><b>{usd(t.windowVolumeWei, rate) ?? "…"}</b> <small>{t.windowSales} sale{(t.windowSales ?? 0) !== 1 ? "s" : ""}</small></>
                   : <small>—</small>}
               </span>
               <span className="tt-num tt-left">{t.left} / {t.maxSupply}</span>

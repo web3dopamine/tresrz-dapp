@@ -7,7 +7,7 @@ import { CoverArt } from "@/lib/art";
 import { api, type Track } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useBuyTrack } from "@/lib/useBuyTrack";
-import { useUsdRate, usd, fmtEth } from "@/lib/usd";
+import { useUsdRate, usd } from "@/lib/usd";
 
 /**
  * Payment-method chooser. BUY buttons open this instead of demanding a wallet:
@@ -66,7 +66,6 @@ export default function BuyModal({
   if (!mounted || !open || !track) return null;
 
   const priceUsd = usd(track.priceWei, rate);
-  const priceEth = fmtEth(track.priceWei);
   const onChain = track.chainTokenId != null;
   const customOk = /^0x[a-fA-F0-9]{40}$/.test(deliverTo.trim());
   const shortAddr = address ? `${address.slice(0, 6)}…${address.slice(-4)}` : "";
@@ -105,7 +104,7 @@ export default function BuyModal({
           <div className="bm-meta">
             <b>{track.title}</b>
             <span>by {track.artist.handle} · {track.left} of {track.maxSupply} left</span>
-            <em>{priceUsd ?? `${priceEth} ETH`}</em>
+            <em>{priceUsd ?? "…"}</em>
           </div>
         </div>
 
@@ -150,8 +149,8 @@ export default function BuyModal({
             )}
 
             <div className="bm-opt">
-              <h4>Ξ PAY WITH CRYPTO <i>ETH</i></h4>
-              <p>Buy directly on-chain from your wallet ({priceUsd ?? `${priceEth} ETH`}, paid in ETH + gas).</p>
+              <h4>Ξ PAY WITH CRYPTO <i>on-chain</i></h4>
+              <p>Buy directly from your wallet ({priceUsd ?? "…"}, plus a small network fee).</p>
               {!isConnected ? (
                 <button className="buy" onClick={() => openConnectModal?.()}>CONNECT WALLET</button>
               ) : !token ? (
@@ -160,7 +159,7 @@ export default function BuyModal({
                 </button>
               ) : (
                 <button className="buy" disabled={busy} onClick={payCrypto}>
-                  {busy ? "CONFIRMING…" : `BUY NOW · ${priceUsd ?? `${priceEth} ETH`}`}
+                  {busy ? "CONFIRMING…" : `BUY NOW · ${priceUsd ?? "…"}`}
                 </button>
               )}
             </div>

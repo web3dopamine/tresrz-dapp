@@ -89,9 +89,9 @@ export default function TrackPage() {
 
   // forms
   const [offerQty, setOfferQty] = useState("1");
-  const [offerPrice, setOfferPrice] = useState("0.1");
+  const [offerPrice, setOfferPrice] = useState("25"); // USD
   const [listQty, setListQty] = useState("1");
-  const [listPrice, setListPrice] = useState("0.1");
+  const [listPrice, setListPrice] = useState("25"); // USD
   const [xferTo, setXferTo] = useState("");
   const [xferQty, setXferQty] = useState("1");
   // inline edit of one of your own listings: null = closed
@@ -245,7 +245,7 @@ export default function TrackPage() {
     if (!track) return;
     const res = await acceptOffer(o.id, track.id, o.qty);
     if (!res.ok) return toast(res.error);
-    toast(res.warn ? `⚠ ${res.warn}` : `Offer accepted — ${usd(o.unit * BigInt(o.qty), rate) ?? `${ethStr(o.unit * BigInt(o.qty))} ETH`} received ✓`);
+    toast(res.warn ? `⚠ ${res.warn}` : `Offer accepted — ${usd(o.unit * BigInt(o.qty), rate) ?? "payment"} received ✓`);
     refreshChain();
   }
 
@@ -264,9 +264,20 @@ export default function TrackPage() {
     refreshChain();
   }
 
+  // Prices are entered in USD; the on-chain market is ETH-denominated, so convert
+  // at the live rate right before the tx. ETH never surfaces in the UI.
+  function usdInputToEth(usdStr: string): string | null {
+    if (!rate) return null;
+    const u = Number(usdStr);
+    if (!Number.isFinite(u) || u < 0) return null;
+    return (u / rate).toString();
+  }
+
   async function onUpdateListing() {
     if (!editListing) return;
-    const res = await updateListing(editListing.id, Number(editListing.qty) || 1, editListing.price);
+    const ethStr = usdInputToEth(editListing.price);
+    if (ethStr == null) return toast("Price unavailable for a moment — try again");
+    const res = await updateListing(editListing.id, Number(editListing.qty) || 1, ethStr);
     if (!res.ok) return toast(res.error);
     setEditListing(null);
     toast("Listing updated ✓");
@@ -275,7 +286,9 @@ export default function TrackPage() {
 
   async function onMakeOffer() {
     if (chainTokenId == null) return toast("Track not yet on-chain");
-    const res = await makeOffer(chainTokenId, Number(offerQty) || 1, offerPrice);
+    const ethStr = usdInputToEth(offerPrice);
+    if (ethStr == null) return toast("Price unavailable for a moment — try again");
+    const res = await makeOffer(chainTokenId, Number(offerQty) || 1, ethStr);
     if (!res.ok) return toast(res.error);
     toast("Offer submitted ✓");
     refreshChain();
@@ -283,7 +296,9 @@ export default function TrackPage() {
 
   async function onList() {
     if (chainTokenId == null) return toast("Track not yet on-chain");
-    const res = await list(chainTokenId, Number(listQty) || 1, listPrice);
+    const ethStr = usdInputToEth(listPrice);
+    if (ethStr == null) return toast("Price unavailable for a moment — try again");
+    const res = await list(chainTokenId, Number(listQty) || 1, ethStr);
     if (!res.ok) return toast(res.error);
     toast("Listed for sale ✓");
     refreshChain();
@@ -364,8 +379,8 @@ export default function TrackPage() {
 
               {/* stat strip: top offer / last sale / left / royalty */}
               <div className="os-statbar">
-                <div><span>TOP OFFER</span><b>{topOffer !== null ? (usd(topOffer, rate) ?? `${ethStr(topOffer)} ETH`) : "—"}</b></div>
-                <div><span>LAST SALE</span><b>{lastSale ? (usd(lastSale, rate) ?? `${ethStr(lastSale)} ETH`) : "—"}</b></div>
+                <div><span>TOP OFFER</span><b>{topOffer !== null ? (usd(topOffer, rate) ?? "…") : "—"}</b></div>
+                <div><span>LAST SALE</span><b>{lastSale ? (usd(lastSale, rate) ?? "…") : "—"}</b></div>
                 <div><span>EDITIONS LEFT</span><b>{track.left} / {track.maxSupply}</b></div>
                 <div><span>ROYALTY</span><b>{chainInfo?.royaltyPct != null ? `${chainInfo.royaltyPct}%` : "—"}</b></div>
               </div>
@@ -374,11 +389,7 @@ export default function TrackPage() {
               <div className="os-buybox">
                 {minting && <div className="os-minting">⏳ Finalizing on-chain — this track becomes buyable in a few seconds…</div>}
                 <span className="os-buy-label">BUY FOR</span>
-                {rate ? (
-                  <div className="os-price">{usd(track.priceWei, rate)}</div>
-                ) : (
-                  <div className="os-price">{ethStr(track.priceWei)} <small>ETH</small></div>
-                )}
+                <div className="os-price">{usd(track.priceWei, rate) ?? "…"}</div>
                 <div className="os-buy-actions">
                   <button className="buy os-buynow" disabled={track.left === 0 || minting} onClick={() => setBuyOpen(true)}>
                     {minting ? "FINALIZING…" : track.left === 0 ? "SOLD OUT" : "BUY NOW"}
@@ -398,7 +409,7 @@ export default function TrackPage() {
                 {showOffer && (
                   <div className="tk-row os-offer-row">
                     <input type="number" min={1} step={1} value={offerQty} onChange={(e) => setOfferQty(e.target.value)} placeholder="qty" />
-                    <input type="number" min={0} step="0.001" value={offerPrice} onChange={(e) => setOfferPrice(e.target.value)} placeholder="ETH / unit" />
+                    <input type="number" min={0} step="0.01" value={offerPrice} onChange={(e) => setOfferPrice(e.target.value)} placeholder="USD / unit" />
                     <button className="buy tk-mini" disabled={offering} onClick={onMakeOffer}>{offering ? "…" : "SUBMIT OFFER"}</button>
                   </div>
                 )}
@@ -456,7 +467,7 @@ export default function TrackPage() {
                         <li key={i}>
                           <span className={`tk-kind tk-${h.kind.includes("primary") ? "pri" : "sec"}`}>{h.kind.replace("secondary_", "").replace("fiat_primary", "card")}</span>
                           <span className="tk-qty">×{h.qty}</span>
-                          <span className="tk-price">{usd(h.unitWei, rate) ?? `${ethStr(h.unitWei)} ETH`}</span>
+                          <span className="tk-price">{usd(h.unitWei, rate) ?? "…"}</span>
                           <span className="tk-date">{new Date(h.at).toLocaleDateString()}</span>
                         </li>
                       ))}
@@ -480,7 +491,7 @@ export default function TrackPage() {
                       return (
                         <li key={l.id} className={editListing?.id === l.id ? "tk-editing" : undefined}>
                           <div className="tk-listing-row">
-                            <span><b>{l.qty}</b> edition{l.qty > 1 ? "s" : ""} @ <b>{usd(l.unit, rate) ?? `${ethStr(l.unit)} ETH`}</b></span>
+                            <span><b>{l.qty}</b> edition{l.qty > 1 ? "s" : ""} @ <b>{usd(l.unit, rate) ?? "…"}</b></span>
                             <span className="tk-seller">seller {l.seller.slice(0, 6)}…{l.seller.slice(-4)}</span>
                             {mine ? (
                               <span className="tk-own-actions">
@@ -492,7 +503,7 @@ export default function TrackPage() {
                                     setEditListing(
                                       editListing?.id === l.id
                                         ? null
-                                        : { id: l.id, qty: String(l.qty), price: formatEther(l.unit) },
+                                        : { id: l.id, qty: String(l.qty), price: rate ? (Number(formatEther(l.unit)) * rate).toFixed(2) : "" },
                                     )
                                   }
                                 >
@@ -516,9 +527,9 @@ export default function TrackPage() {
                                 placeholder="qty"
                               />
                               <input
-                                type="number" min={0} step="0.001" value={editListing.price}
+                                type="number" min={0} step="0.01" value={editListing.price}
                                 onChange={(e) => setEditListing({ ...editListing, price: e.target.value })}
-                                placeholder="ETH / unit"
+                                placeholder="USD / unit"
                               />
                               <button className="buy tk-mini" disabled={updatingListing} onClick={onUpdateListing}>
                                 {updatingListing ? "…" : "SAVE"}
@@ -543,7 +554,7 @@ export default function TrackPage() {
                         return (
                           <li key={o.id}>
                             <div className="tk-listing-row">
-                              <span><b>{o.qty}</b> edition{o.qty > 1 ? "s" : ""} @ <b>{usd(o.unit, rate) ?? `${ethStr(o.unit)} ETH`}</b> <small className="tk-seller">({usd(o.unit * BigInt(o.qty), rate) ?? `${ethStr(o.unit * BigInt(o.qty))} ETH`} total, escrowed)</small></span>
+                              <span><b>{o.qty}</b> edition{o.qty > 1 ? "s" : ""} @ <b>{usd(o.unit, rate) ?? "…"}</b> <small className="tk-seller">({usd(o.unit * BigInt(o.qty), rate) ?? "…"} total, escrowed)</small></span>
                               <span className="tk-seller">from {o.buyer.slice(0, 6)}…{o.buyer.slice(-4)}</span>
                               {mine ? (
                                 <span className="tk-own-actions">
@@ -575,7 +586,7 @@ export default function TrackPage() {
                       <h4>LIST FOR SALE · you own {ownedQty}</h4>
                       <div className="tk-row">
                         <input type="number" min={1} max={ownedQty} step={1} value={listQty} onChange={(e) => setListQty(e.target.value)} placeholder="qty" />
-                        <input type="number" min={0} step="0.001" value={listPrice} onChange={(e) => setListPrice(e.target.value)} placeholder="ETH / unit" />
+                        <input type="number" min={0} step="0.01" value={listPrice} onChange={(e) => setListPrice(e.target.value)} placeholder="USD / unit" />
                         <button className="buy tk-mini" disabled={listing} onClick={onList}>{listing ? "…" : "LIST"}</button>
                       </div>
                     </div>
