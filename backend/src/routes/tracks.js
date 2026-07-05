@@ -108,6 +108,20 @@ r.get("/trending", optionalAuth, async (req, res) => {
   res.json(ranked);
 });
 
+// GET /api/tracks/mine  -> the logged-in user's own created/minted tracks
+// (any auth method — email, Google, or wallet). Unlike the public list this
+// includes tracks still confirming on-chain (mintStatus "minting") and failed
+// ones, so a creator always sees everything they've minted. Must be registered
+// before /:id or "mine" is parsed as a track id.
+r.get("/mine", requireAuth, async (req, res) => {
+  const tracks = await prisma.track.findMany({
+    where: { artistId: req.user.id },
+    orderBy: { createdAt: "desc" },
+    include: { artist: true, _count: { select: { likes: true } }, likes: { where: { userId: req.user.id } } },
+  });
+  res.json(tracks.map((t) => shape(t, req.user.id)));
+});
+
 r.get("/:id", optionalAuth, async (req, res) => {
   const t = await prisma.track.findUnique({
     where: { id: req.params.id },

@@ -7,12 +7,16 @@ import Header from "@/components/Header";
 import { CoverArt, avatarUrl } from "@/lib/art";
 import { musicAbi, MUSIC_CONTRACT } from "@/lib/abi";
 import { api, type Track } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { useTransfer } from "@/lib/useMarket";
 
 export default function CollectionPage() {
   const { address, isConnected } = useAccount();
+  const { token, openAuth } = useAuth();
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loadedTracks, setLoadedTracks] = useState(false);
+  const [created, setCreated] = useState<Track[]>([]);
+  const [loadedCreated, setLoadedCreated] = useState(false);
   const [msg, setMsg] = useState("");
   const tRef = useRef<any>(null);
   function toast(m: string) { setMsg(m); clearTimeout(tRef.current); tRef.current = setTimeout(() => setMsg(""), 2400); }
@@ -22,6 +26,17 @@ export default function CollectionPage() {
   const { transfer, busy: transferring } = useTransfer();
 
   useEffect(() => { api.tracks().then((d) => { setTracks(d); setLoadedTracks(true); }).catch(() => setLoadedTracks(true)); }, []);
+
+  // Tracks the logged-in user has minted (works for email/Google accounts with no wallet).
+  useEffect(() => {
+    if (!token) { setCreated([]); setLoadedCreated(false); return; }
+    let live = true;
+    setLoadedCreated(false);
+    api.myTracks()
+      .then((d) => { if (live) { setCreated(d); setLoadedCreated(true); } })
+      .catch(() => { if (live) setLoadedCreated(true); });
+    return () => { live = false; };
+  }, [token]);
 
   const { data: nextId } = useReadContract({ abi: musicAbi, address: MUSIC_CONTRACT, functionName: "nextTrackId" });
   const maxId = nextId ? Number(nextId) - 1 : 0;
@@ -61,21 +76,83 @@ export default function CollectionPage() {
     refetchBalances();
   }
 
-  const loading = !loadedTracks || (balanceCalls.length > 0 && balLoading);
+  const ownedLoading = balanceCalls.length > 0 && balLoading;
+
+  // Not signed in at all (no account, no wallet): a single friendly gate.
+  if (!token && !isConnected) {
+    return (
+      <div className="wrap">
+        <Header />
+        <section className="block">
+          <div className="sec-title">MY COLLECTION</div>
+          <div className="sec-bar" />
+          <div className="mint-gate">
+            <p>Log in to see the tracks you’ve minted — or connect a wallet to see editions you own on-chain.</p>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+              <button className="buy" style={{ width: "auto", padding: "12px 22px" }} onClick={openAuth}>SIGN UP / LOG IN</button>
+              <ConnectButton showBalance={false} label="CONNECT WALLET" />
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="wrap">
       <Header />
+
+      {/* Tracks the user created (email/Google/wallet) */}
+      {token && (
+        <section className="block">
+          <div className="sec-title">CREATED BY YOU</div>
+          <div className="sec-bar" />
+          {!loadedCreated ? (
+            <div className="muted-note">Loading your tracks…</div>
+          ) : created.length === 0 ? (
+            <div className="muted-note">You haven’t minted anything yet. <Link href="/mint" style={{ color: "var(--crimson-soft)" }}>Mint a track →</Link></div>
+          ) : (
+            <div className="artist-grid">
+              {created.map((track) => {
+                const minting = track.mintStatus === "minting";
+                const failed = track.mintStatus === "failed";
+                return (
+                  <div key={track.id} className="card">
+                    <Link href={`/track/${track.id}`} className="art" style={{ marginBottom: 11, textDecoration: "none", display: "block" }}>
+                      <CoverArt seed={track.coverSeed} />
+                      <div className="genre">{track.genre}</div>
+                      {minting && <span className="owned-badge" style={{ background: "rgba(245,132,38,.9)" }}>MINTING…</span>}
+                      {failed && <span className="owned-badge" style={{ background: "rgba(200,40,40,.9)" }}>FAILED</span>}
+                    </Link>
+                    <h3>
+                      <Link href={`/track/${track.id}`} style={{ color: "inherit", textDecoration: "none" }}>{track.title}</Link>
+                    </h3>
+                    <div className="by"><img src={avatarUrl(track.artist.avatarSeed)} alt="" /><span>by <b>{track.artist.handle}</b></span></div>
+                    <div className="price">
+                      {minting ? "finalizing on-chain…" : failed ? "mint failed — try again" : `${track.minted}/${track.maxSupply} sold · token #${track.chainTokenId ?? "—"}`}
+                    </div>
+                    <div className="col-actions">
+                      <Link href={`/track/${track.id}`} className="buy col-mini">VIEW TRACK</Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Editions owned on-chain (needs a wallet) */}
       <section className="block">
-        <div className="sec-title">MY COLLECTION</div>
+        <div className="sec-title">OWNED EDITIONS</div>
         <div className="sec-bar" />
 
         {!isConnected ? (
-          <div className="mint-gate">
-            <p>Connect your wallet to see the editions you own.</p>
-            <ConnectButton showBalance={false} label="CONNECT WALLET" />
+          <div className="muted-note">
+            Connect a wallet to see editions you own on-chain.
+            <div style={{ marginTop: 12 }}><ConnectButton showBalance={false} label="CONNECT WALLET" /></div>
           </div>
-        ) : loading ? (
+        ) : ownedLoading ? (
           <div className="muted-note">Reading your on-chain balances…</div>
         ) : owned.length === 0 ? (
           <div className="muted-note">You don’t own any editions yet. <Link href="/" style={{ color: "var(--crimson-soft)" }}>Browse tracks →</Link></div>

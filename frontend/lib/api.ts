@@ -60,6 +60,7 @@ export const api = {
   tracks: (q = ""): Promise<Track[]> => req(`/api/tracks${q}`),
   trending: (window: TrendWindow = "1d"): Promise<TrendingTrack[]> => req(`/api/tracks/trending?window=${window}`),
   track: (id: string): Promise<Track> => req(`/api/tracks/${id}`),
+  myTracks: (): Promise<Track[]> => req(`/api/tracks/mine`),
   artists: (): Promise<Artist[]> => req(`/api/artists`),
   artist: (key: string): Promise<ArtistDetail> => req(`/api/artists/${key}`),
   nonce: (address: string): Promise<{ nonce: string }> => req(`/api/auth/nonce?address=${address}`),
