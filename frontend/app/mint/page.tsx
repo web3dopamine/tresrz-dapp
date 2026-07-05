@@ -4,10 +4,12 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import { CoverArt } from "@/lib/art";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 
 type Status = "idle" | "minting" | "done" | "error";
 
 export default function MintPage() {
+  const { token, openAuth } = useAuth();
   const [title, setTitle] = useState("");
   const [genre, setGenre] = useState("");
   const [description, setDescription] = useState("");
@@ -62,6 +64,14 @@ export default function MintPage() {
       <section className="block">
         <div className="sec-title">MINT A TRACK</div>
         <div className="sec-bar" />
+
+        {!token ? (
+          <div className="mint-gate">
+            <p>Log in to mint a track. It only takes a moment — email or Google, no wallet needed.</p>
+            <button className="buy" style={{ width: "auto", padding: "12px 22px" }} onClick={openAuth}>SIGN UP / LOG IN</button>
+          </div>
+        ) : (
+        <>
         <p className="mint-lead">Fill in your track and hit mint — no wallet or crypto needed. It goes live on the marketplace and fans can buy editions with a card or crypto.</p>
 
         <div className="mint-grid">
@@ -113,6 +123,8 @@ export default function MintPage() {
             </div>
           </div>
         </div>
+        </>
+        )}
       </section>
     </div>
   );

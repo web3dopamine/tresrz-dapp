@@ -1,6 +1,5 @@
 "use client";
 import Link from "next/link";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount } from "wagmi";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
@@ -9,10 +8,11 @@ import { api } from "@/lib/api";
 
 export default function Header({ search, setSearch }: { search?: string; setSearch?: (s: string) => void }) {
   const { address, isConnected } = useAccount();
-  const { token, signIn, signOut, loading } = useAuth();
+  const { token, me, signOut, openAuth } = useAuth();
   const { theme, toggle } = useTheme();
   const [isAdmin, setIsAdmin] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const who = me?.handle || (me?.email ? me.email.split("@")[0] : (me?.address ? `${me.address.slice(0, 6)}…` : "Account"));
 
   // NOTE: SIWE sign-in is explicit (the "SIGN IN" button below) — we no longer
   // auto-prompt on connect, so MetaMask doesn't pop a signature on every refresh.
@@ -75,13 +75,14 @@ export default function Header({ search, setSearch }: { search?: string; setSear
         <span suppressHydrationWarning>{theme === "dark" ? "LIGHT" : "DARK"}</span>
       </button>
       <div className="auth-area">
-        {isConnected && !token && (
-          <button className="theme-toggle" onClick={() => void signIn()} disabled={loading} title="Sign in with your wallet">
-            {loading ? "SIGNING…" : "SIGN IN"}
-          </button>
+        {token ? (
+          <>
+            <span className="au-who" title={me?.email || me?.address || ""}>{who}</span>
+            <button className="au-signout" onClick={signOut}>SIGN OUT</button>
+          </>
+        ) : (
+          <button className="au-login" onClick={openAuth}>SIGN UP / LOGIN</button>
         )}
-        {token && <button className="heart" style={{ color: "var(--muted)", fontSize: 11 }} onClick={signOut}>SIGN OUT</button>}
-        <ConnectButton showBalance={false} accountStatus="address" chainStatus="icon" label="SIGN UP / LOGIN" />
       </div>
     </header>
   );

@@ -9,8 +9,10 @@ datasource db {
 
 model User {
   id        String   @id @default(cuid())
-  address   String?  @unique            // wallet address (null for custodial, wallet-less creators)
-  email     String?                      // custodial creators' contact (NOT identity — unverified; the manage token is the identity)
+  address   String?  @unique            // wallet address (SIWE users); null for email/Google accounts
+  email     String?  @unique            // email/Google account identity
+  passwordHash String?                   // email+password accounts (scrypt salt:hash)
+  googleId  String?  @unique            // Google (Gmail) OAuth accounts (sub claim)
   handle    String?  @unique
   avatarSeed Int     @default(0)
   bio       String?

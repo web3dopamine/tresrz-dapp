@@ -475,3 +475,28 @@ nav{margin-left:0}
 .mint-mini{width:auto!important;padding:9px 14px!important;font-size:11px!important;text-decoration:none}
 .mint-ghost{background:transparent!important;color:var(--ink)!important;border:1.5px solid var(--card-line)!important}
 @media(max-width:560px){.mint-modes{grid-template-columns:1fr}}
+
+/* --- auth (header + modal) --- */
+.au-login{background:var(--crimson);color:#fff;border:none;font-family:var(--mono);font-weight:700;font-size:11px;letter-spacing:1.5px;padding:10px 16px;border-radius:6px;cursor:pointer;white-space:nowrap;transition:.2s}
+.au-login:hover{filter:brightness(1.1);box-shadow:var(--glow)}
+[data-theme="light"] .au-login{background:var(--magenta);color:#fff;border:2px solid var(--navy);box-shadow:3px 3px 0 var(--navy)}
+.au-who{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--ink);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.au-signout{background:none;border:1px solid var(--card-line);color:var(--muted);font-family:var(--mono);font-weight:700;font-size:10px;letter-spacing:1px;padding:7px 11px;border-radius:4px;cursor:pointer;transition:.2s}
+.au-signout:hover{border-color:var(--crimson);color:var(--ink)}
+[data-theme="light"] .au-signout{border:2px solid var(--navy);color:var(--navy)}
+.au-panel{max-width:400px;display:flex;flex-direction:column;gap:14px}
+.au-title{margin:0;padding-right:30px;font-size:19px;color:var(--ink);letter-spacing:.5px}
+.au-google{display:flex;justify-content:center;min-height:0}
+.au-google:empty{display:none}
+.au-or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:11px}
+.au-or::before,.au-or::after{content:"";flex:1;height:1px;background:var(--card-line)}
+.au-form{display:flex;flex-direction:column;gap:10px}
+.au-form input{background:transparent;border:1.5px solid var(--card-line);color:var(--ink);font-family:var(--mono);font-size:13px;padding:11px 12px;border-radius:6px;outline:none;transition:.2s}
+.au-form input:focus{border-color:var(--crimson);box-shadow:var(--glow)}
+[data-theme="light"] .au-form input{border:2px solid var(--navy)}
+.au-form .buy{margin-top:2px;padding:12px}
+.au-switch{font-size:12px;color:var(--muted);text-align:center}
+.au-switch button{background:none;border:none;color:var(--crimson-soft);font-family:var(--mono);font-weight:700;font-size:12px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.au-wallet{text-align:center;border-top:1px solid var(--line-soft);padding-top:12px}
+.au-walletbtn{background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:11px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.au-walletbtn:hover{color:var(--ink)}

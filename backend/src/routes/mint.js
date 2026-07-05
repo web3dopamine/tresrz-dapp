@@ -1,6 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { prisma } from "../db.js";
+import { requireAuth } from "../middleware/auth.js";
 import { pinFile, pinJSON, buildMetadata } from "../ipfs.js";
 import { platformMint, deliveryConfigured } from "../chain.js";
 
@@ -24,7 +25,7 @@ r.get("/status", (_req, res) => res.json({ enabled: custodialEnabled() }));
 // POST /api/mint/custodial  (multipart)
 // fields: title, genre, description?, maxSupply, priceEth, royaltyPct, coverSeed?, email, handle?
 // files:  audio (required), image (optional)
-r.post("/custodial", upload.fields([{ name: "audio", maxCount: 1 }, { name: "image", maxCount: 1 }]), async (req, res) => {
+r.post("/custodial", requireAuth, upload.fields([{ name: "audio", maxCount: 1 }, { name: "image", maxCount: 1 }]), async (req, res) => {
   if (!custodialEnabled()) return res.status(503).json({ error: "custodial minting not configured" });
   try {
     const b = req.body || {};
@@ -72,14 +73,15 @@ r.post("/custodial", upload.fields([{ name: "audio", maxCount: 1 }, { name: "ima
     const metadataUri = metaPin.uri || metaPin.url;
     if (!metadataUri) return res.status(502).json({ error: "metadata pin failed" });
 
-    // ---- 3) create a display-only artist record BEFORE the irreversible mint,
-    // so the only post-mint DB write is the Track insert. The platform wallet is
-    // the on-chain artist, so ALL crypto proceeds go to it; this record only
-    // provides the artist name shown on the marketplace.
-    const handleFree = handle ? !(await prisma.user.findUnique({ where: { handle } })) : false;
-    const creator = await prisma.user.create({
-      data: { handle: handleFree ? handle : null, custodial: true, avatarSeed: Math.floor(Math.random() * 9999) },
-    });
+    // ---- 3) the artist is the LOGGED-IN user (attribution/display). The platform
+    // wallet is the on-chain artist, so ALL crypto proceeds go to it. If the user
+    // gave an artist name and doesn't have one yet, adopt it (when free).
+    const creator = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!creator) return res.status(401).json({ error: "account not found" });
+    if (handle && !creator.handle) {
+      const free = !(await prisma.user.findUnique({ where: { handle } }));
+      if (free) await prisma.user.update({ where: { id: creator.id }, data: { handle } });
+    }
 
     // ---- 4) platform-mint on-chain (irreversible) ----
     const mint = await platformMint({ maxSupply, priceWei, royaltyBps, metadataUri });

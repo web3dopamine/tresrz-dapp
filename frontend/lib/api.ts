@@ -64,6 +64,11 @@ export const api = {
   nonce: (address: string): Promise<{ nonce: string }> => req(`/api/auth/nonce?address=${address}`),
   verify: (message: string, signature: string) => req(`/api/auth/verify`, { method: "POST", body: JSON.stringify({ message, signature }) }),
   me: (): Promise<{ user: any; isAdmin: boolean }> => req(`/api/auth/me`),
+  // email + Google accounts (no email verification)
+  signupEmail: (b: { email: string; password: string; handle?: string }): Promise<{ token: string; user: any }> => req(`/api/auth/signup`, { method: "POST", body: JSON.stringify(b) }),
+  loginEmail: (b: { email: string; password: string }): Promise<{ token: string; user: any }> => req(`/api/auth/login`, { method: "POST", body: JSON.stringify(b) }),
+  loginGoogle: (credential: string): Promise<{ token: string; user: any }> => req(`/api/auth/google`, { method: "POST", body: JSON.stringify({ credential }) }),
+  googleStatus: (): Promise<{ enabled: boolean; clientId: string | null }> => req(`/api/auth/google/status`),
   toggleLike: (trackId: string) => req(`/api/likes/${trackId}`, { method: "POST" }),
   recordSale: (b: { trackId: string; qty: number; priceWei: string; txHash: string }) => req(`/api/sales`, { method: "POST", body: JSON.stringify(b) }),
   recordSecondarySale: (b: { trackId: string; qty: number; txHash: string }) => req(`/api/sales/secondary`, { method: "POST", body: JSON.stringify(b) }),
