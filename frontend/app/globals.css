@@ -130,6 +130,7 @@ footer{margin-top:30px;border-top:1px solid var(--card-line);padding:40px 34px 6
 .foot-col h5{font-family:var(--pixel);font-size:11px;color:var(--crimson-soft);margin-bottom:16px}
 .foot-col a{display:block;color:var(--muted);font-size:12px;text-decoration:none;margin-bottom:9px;transition:.2s}.foot-col a:hover{color:var(--ink);padding-left:4px}
 .foot-bottom{margin-top:36px;padding-top:20px;border-top:1px solid var(--line-soft);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;color:var(--muted);font-size:11px;letter-spacing:1px}
+.foot-legal a{color:inherit;text-decoration:none;transition:.2s}.foot-legal a:hover{color:var(--ink)}
 .cookie{position:fixed;left:0;bottom:0;z-index:80;width:300px;background:var(--card-grad);border-top:1px solid var(--card-line);border-right:1px solid var(--card-line);padding:18px;transition:.4s}
 .cookie.hide{transform:translateY(120%)}.cookie p{font-size:13px;font-weight:700;margin-bottom:14px;color:var(--ink)}
 .cookie .save{width:100%;background:var(--crimson);color:#fff;border:none;font-family:var(--mono);font-weight:700;padding:13px;border-radius:3px;cursor:pointer;letter-spacing:1px}

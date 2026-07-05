@@ -26,11 +26,11 @@ export default function AboutPage() {
         <div className="sec-bar" />
         <div className="about-panel">
           <ol>
-            <li><b>Connect &amp; sign in</b> — connect a wallet (MetaMask or WalletConnect) and sign a Sign-In-With-Ethereum message. No password, no email.</li>
-            <li><b>Mint</b> — upload your audio and cover art (pinned to IPFS), set supply, price and royalty, and confirm the mint transaction. <Link href="/mint">Mint a track →</Link></li>
-            <li><b>Collect</b> — buy editions on the primary market, or via listings and offers on the secondary market. Your holdings live in <Link href="/collection">your collection</Link>.</li>
-            <li><b>Stream</b> — holders (and the artist) stream the full track; non-holders hear the preview.</li>
-            <li><b>Trade</b> — list editions at a fixed price, make or accept offers, or transfer to any address, all from a track&apos;s page.</li>
+            <li><b>Sign in</b> — create an account with email or Google in a few seconds. No wallet or crypto required to get started.</li>
+            <li><b>Publish</b> — upload your audio and cover art (pinned to IPFS), set the supply, a price in USD and your royalty, and hit publish. It goes on-chain in the background and lands live on the marketplace. <Link href="/mint">Publish a track →</Link></li>
+            <li><b>Collect</b> — fans buy editions with a card (USD) or with crypto — no wallet needed for card checkout. Holdings live in <Link href="/collection">your collection</Link>.</li>
+            <li><b>Stream</b> — holders (and the artist) stream the full track; everyone else hears the preview.</li>
+            <li><b>Trade</b> — connect a wallet to list editions, make or accept offers, or transfer to any address from a track&apos;s page. Prices are shown and entered in USD.</li>
           </ol>
         </div>
       </section>
@@ -60,6 +60,51 @@ export default function AboutPage() {
             contract addresses are linked from every track&apos;s ON-CHAIN panel.
           </p>
           <p><Link href="/">← Back to the marketplace</Link></p>
+        </div>
+      </section>
+
+      <section className="block" id="terms">
+        <div className="sec-title">TERMS</div>
+        <div className="sec-bar" />
+        <div className="about-panel">
+          <p>
+            TRESRZ is provided “as is” for publishing, buying and streaming music editions. By
+            using it you confirm you own or are licensed to distribute any audio and artwork you
+            publish, and that you will not upload infringing, unlawful or harmful content. Editions
+            are blockchain assets: on-chain transactions are final and irreversible, and their value
+            can go down as well as up. We may remove content that violates these terms or the law,
+            and we are not liable for losses arising from use of the marketplace, third-party
+            wallets, or the underlying network. This is an early-stage product currently running on
+            a test network.
+          </p>
+        </div>
+      </section>
+
+      <section className="block" id="privacy">
+        <div className="sec-title">PRIVACY</div>
+        <div className="sec-bar" />
+        <div className="about-panel">
+          <p>
+            We collect only what we need to run the service: your account email (or Google account
+            identifier), the tracks you publish, and basic activity such as likes and purchases.
+            Passwords are stored only as salted hashes; we never see your card details — card
+            payments are handled by Stripe. Public blockchain data (wallet addresses, transactions)
+            is inherently public. We don’t sell your personal data. To access or delete your data,
+            email <a href="mailto:hello@tresrz.app">hello@tresrz.app</a>.
+          </p>
+        </div>
+      </section>
+
+      <section className="block" id="cookies">
+        <div className="sec-title">COOKIES</div>
+        <div className="sec-bar" />
+        <div className="about-panel">
+          <p>
+            TRESRZ uses only essential storage — a login token kept in your browser to keep you
+            signed in, and a small flag remembering your cookie choice and theme. We don’t use
+            advertising or third-party tracking cookies. You can clear this storage any time from
+            your browser settings.
+          </p>
         </div>
       </section>
     </div>

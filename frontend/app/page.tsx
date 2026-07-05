@@ -242,10 +242,10 @@ export default function Home() {
             <p>The marketplace where music becomes property. Publish your masters, sell limited editions, and let fans truly own the sound.</p>
           </div>
           <div className="foot-col"><h5>MARKET</h5><a href="#hot">Explore</a><a href="#latest">Suggested</a><a href="#popular">Top artists</a><a href="#genres">Genres</a></div>
-          <div className="foot-col"><h5>CREATE</h5><Link href="/mint">Mint a track</Link><Link href="/about#royalties">Royalties</Link><Link href="/about#docs">How it works</Link><Link href="/collection">Your collection</Link></div>
+          <div className="foot-col"><h5>CREATE</h5><Link href="/mint">Publish a track</Link><Link href="/about#royalties">Royalties</Link><Link href="/about#docs">How it works</Link><Link href="/collection">Your collection</Link></div>
           <div className="foot-col"><h5>COMPANY</h5><Link href="/about">About</Link><Link href="/about#contact">Contact</Link><Link href="/about#docs">Docs</Link></div>
         </div>
-        <div className="foot-bottom"><span>© 2026 TRESRZ — All rights reserved</span><span>TERMS · PRIVACY · COOKIES</span></div>
+        <div className="foot-bottom"><span>© 2026 TRESRZ — All rights reserved</span><span className="foot-legal"><Link href="/about#terms">TERMS</Link> · <Link href="/about#privacy">PRIVACY</Link> · <Link href="/about#cookies">COOKIES</Link></span></div>
       </footer>
 
       <CookieBanner />
