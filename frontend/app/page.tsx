@@ -235,19 +235,6 @@ export default function Home() {
         </div>
       </section>
 
-      <footer>
-        <div className="foot-top">
-          <div className="foot-brand">
-            <div className="logo"><div className="bars"><span /><span /><span /><span /></div><b>TRES<span>RZ</span></b></div>
-            <p>The marketplace where music becomes property. Publish your masters, sell limited editions, and let fans truly own the sound.</p>
-          </div>
-          <div className="foot-col"><h5>MARKET</h5><a href="#hot">Explore</a><a href="#latest">Suggested</a><a href="#popular">Top artists</a><a href="#genres">Genres</a></div>
-          <div className="foot-col"><h5>CREATE</h5><Link href="/mint">Publish a track</Link><Link href="/about#royalties">Royalties</Link><Link href="/about#docs">How it works</Link><Link href="/collection">Your collection</Link></div>
-          <div className="foot-col"><h5>COMPANY</h5><Link href="/about">About</Link><Link href="/about#contact">Contact</Link><Link href="/about#docs">Docs</Link></div>
-        </div>
-        <div className="foot-bottom"><span>© 2026 TRESRZ — All rights reserved</span><span className="foot-legal"><Link href="/about#terms">TERMS</Link> · <Link href="/about#privacy">PRIVACY</Link> · <Link href="/about#cookies">COOKIES</Link></span></div>
-      </footer>
-
       <CookieBanner />
       <BuyModal track={buyTrack} open={!!buyTrack} onClose={() => setBuyTrack(null)} toast={toast} onBought={onBought} />
       <div className={`toast${msg ? " show" : ""}`}>{msg}</div>
