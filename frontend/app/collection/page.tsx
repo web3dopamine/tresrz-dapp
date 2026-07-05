@@ -114,7 +114,7 @@ export default function CollectionPage() {
           ) : (
             <div className="artist-grid">
               {created.map((track) => {
-                const minting = track.mintStatus === "minting";
+                const minting = track.mintStatus === "minting" || track.mintStatus === "publishing";
                 const failed = track.mintStatus === "failed";
                 return (
                   <div key={track.id} className="card">
@@ -129,7 +129,7 @@ export default function CollectionPage() {
                     </h3>
                     <div className="by"><img src={avatarUrl(track.artist.avatarSeed)} alt="" /><span>by <b>{track.artist.handle}</b></span></div>
                     <div className="price">
-                      {minting ? "finalizing on-chain…" : failed ? "mint failed — try again" : `${track.minted}/${track.maxSupply} sold · token #${track.chainTokenId ?? "—"}`}
+                      {minting ? "finalizing on-chain…" : failed ? "publish failed — try again" : `${track.minted}/${track.maxSupply} sold · token #${track.chainTokenId ?? "—"}`}
                     </div>
                     <div className="col-actions">
                       <Link href={`/track/${track.id}`} className="buy col-mini">VIEW TRACK</Link>

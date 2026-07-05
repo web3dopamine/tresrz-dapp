@@ -64,21 +64,7 @@ r.post("/custodial", requireAuth, upload.fields([{ name: "audio", maxCount: 1 },
       return res.status(429).json({ error: "daily minting limit reached, please try again tomorrow" });
     }
 
-    // ---- 1) pin audio + optional image to IPFS ----
-    const audioPin = await pinFile(audio.buffer, audio.originalname, audio.mimetype);
-    const imagePin = image ? await pinFile(image.buffer, image.originalname, image.mimetype) : null;
-
-    // ---- 2) pin ERC-721 metadata ----
-    const meta = buildMetadata({
-      title, description: description || undefined, image: imagePin?.uri || undefined,
-      audio: audioPin.uri, genre, artist: handle || "TRESRZ",
-      attributes: [{ trait_type: "Editions", value: maxSupply }],
-    });
-    const metaPin = await pinJSON(meta, `${title}.json`);
-    const metadataUri = metaPin.uri || metaPin.url;
-    if (!metadataUri) return res.status(502).json({ error: "metadata pin failed" });
-
-    // ---- 3) the artist is the LOGGED-IN user (attribution/display). The platform
+    // ---- the artist is the LOGGED-IN user (attribution/display). The platform
     // wallet is the on-chain artist, so ALL crypto proceeds go to it. If the user
     // gave an artist name and doesn't have one yet, adopt it (when free).
     const creator = await prisma.user.findUnique({ where: { id: req.user.id } });
@@ -88,30 +74,82 @@ r.post("/custodial", requireAuth, upload.fields([{ name: "audio", maxCount: 1 },
       if (free) await prisma.user.update({ where: { id: creator.id }, data: { handle } });
     }
 
-    // ---- 4) SUBMIT the on-chain mint without waiting (returns a tx hash fast) ----
-    const sub = await submitMint({ maxSupply, priceWei, royaltyBps, metadataUri });
-    if (!sub.ok) return res.status(502).json({ error: "could not submit on-chain mint", reason: sub.reason });
-
-    // ---- 5) persist the track in a "minting" state; the reconciler fills in the
-    // tokenId once the tx confirms (usually ~15-30s). The request returns now. ----
+    // ---- persist a "publishing" placeholder and RETURN IMMEDIATELY. The slow work
+    // — pinning audio/image/metadata to IPFS and submitting the on-chain mint — is
+    // done in the background (see finalizePublish). The track is hidden from public
+    // listings until it's live; the creator sees it as "publishing" in the meantime.
     const track = await prisma.track.create({
       data: {
         title: title.slice(0, 120), genre: genre.slice(0, 40), maxSupply, priceWei,
-        coverSeed, audioUrl: audioPin.url || null, audioCid: audioPin.cid || null,
-        coverUrl: imagePin?.url || null, metadataUri, mime: audio.mimetype,
-        chainTokenId: null, txHash: sub.hash, mintTx: sub.hash, mintStatus: "minting",
-        custodial: true, artistId: creator.id,
+        coverSeed, audioUrl: null, audioCid: null, coverUrl: null, metadataUri: null,
+        mime: audio.mimetype, chainTokenId: null, txHash: null, mintTx: null,
+        mintStatus: "publishing", custodial: true, artistId: creator.id,
       },
-      include: { artist: true, _count: { select: { likes: true } } },
     });
 
-    res.status(201).json({ trackId: track.id, txHash: sub.hash, status: "minting" });
+    res.status(201).json({ trackId: track.id, status: "publishing" });
+
+    // Fire-and-forget: pin to IPFS + submit the mint. Buffers stay alive via the
+    // closure until the job finishes. On any failure the track is marked "failed".
+    finalizePublish(track.id, {
+      audioBuf: audio.buffer, audioName: audio.originalname, audioType: audio.mimetype,
+      imageBuf: image?.buffer || null, imageName: image?.originalname, imageType: image?.mimetype,
+      title, description, genre, metaArtist: handle || "TRESRZ", maxSupply, priceWei, royaltyBps,
+    }).catch((e) => console.error("finalizePublish crashed:", track.id, e?.message || e));
   } catch (e) {
     if (e?.code === "P2002") return res.status(409).json({ error: "duplicate value" });
     console.error("custodial mint failed:", e);
     res.status(500).json({ error: "mint failed", detail: String(e.message || e) });
   }
 });
+
+// Retry a flaky async call (Pinata/RPC hiccups) a few times with linear backoff.
+async function withRetry(fn, tries = 3, delayMs = 1500) {
+  let last;
+  for (let i = 0; i < tries; i++) {
+    try { return await fn(); }
+    catch (e) { last = e; if (i < tries - 1) await new Promise((r) => setTimeout(r, delayMs * (i + 1))); }
+  }
+  throw last;
+}
+
+// Background finalize for a "publishing" track: pin audio + image + metadata to
+// IPFS, submit the on-chain mint, then flip the track to "minting" (the tx
+// reconciler below promotes it to "active" once it confirms). Any failure marks
+// the track "failed" so the creator can re-publish.
+async function finalizePublish(trackId, x) {
+  try {
+    const audioPin = await withRetry(() => pinFile(x.audioBuf, x.audioName, x.audioType));
+    const imagePin = x.imageBuf ? await withRetry(() => pinFile(x.imageBuf, x.imageName, x.imageType)) : null;
+
+    const meta = buildMetadata({
+      title: x.title, description: x.description || undefined, image: imagePin?.uri || undefined,
+      audio: audioPin.uri, genre: x.genre, artist: x.metaArtist,
+      attributes: [{ trait_type: "Editions", value: x.maxSupply }],
+    });
+    const metaPin = await withRetry(() => pinJSON(meta, `${x.title}.json`));
+    const metadataUri = metaPin.uri || metaPin.url;
+    if (!metadataUri) throw new Error("metadata pin failed");
+
+    const sub = await withRetry(async () => {
+      const s = await submitMint({ maxSupply: x.maxSupply, priceWei: x.priceWei, royaltyBps: x.royaltyBps, metadataUri });
+      if (!s.ok) throw new Error("submit failed: " + (s.reason || "unknown"));
+      return s;
+    });
+
+    await prisma.track.update({
+      where: { id: trackId },
+      data: {
+        audioUrl: audioPin.url || null, audioCid: audioPin.cid || null, coverUrl: imagePin?.url || null,
+        metadataUri, txHash: sub.hash, mintTx: sub.hash, mintStatus: "minting",
+      },
+    });
+    console.log("publish submitted on-chain:", trackId, sub.hash);
+  } catch (e) {
+    console.error("finalizePublish failed for", trackId, e?.message || e);
+    await prisma.track.update({ where: { id: trackId }, data: { mintStatus: "failed" } }).catch(() => {});
+  }
+}
 
 // Background reconciler: finalizes "minting" tracks once their tx confirms —
 // sets the real chainTokenId (from the TrackMinted event) and flips to active,
@@ -135,6 +173,15 @@ export function startMintReconciler() {
           console.error("mint reverted for track", t.id, "tx", t.mintTx);
         } // pending: leave for the next tick
       }
+
+      // crash safety: a "publishing" track that never reached submit (process died
+      // mid-job, so its buffers are gone) can't self-heal — fail it after 15 min so
+      // it stops hanging and the creator can re-publish.
+      const stuck = await prisma.track.updateMany({
+        where: { mintStatus: "publishing", mintTx: null, createdAt: { lt: new Date(Date.now() - 15 * 60e3) } },
+        data: { mintStatus: "failed" },
+      });
+      if (stuck.count) console.warn("marked", stuck.count, "stuck 'publishing' track(s) as failed");
     } catch (e) {
       console.error("mint reconciler tick failed:", e.message);
     }

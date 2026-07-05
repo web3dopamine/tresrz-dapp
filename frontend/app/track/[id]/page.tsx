@@ -127,8 +127,8 @@ export default function TrackPage() {
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 
-  // while a track is still confirming on-chain (background mint), poll until it's live
-  const minting = track?.mintStatus === "minting" && track?.chainTokenId == null;
+  // while a track is still publishing (IPFS + on-chain, in the background), poll until it's live
+  const minting = (track?.mintStatus === "minting" || track?.mintStatus === "publishing") && track?.chainTokenId == null;
   useEffect(() => {
     if (!minting) return;
     const iv = setInterval(() => { api.track(id).then((t) => setTrack(t)).catch(() => {}); }, 6000);
