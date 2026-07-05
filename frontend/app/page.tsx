@@ -199,7 +199,6 @@ export default function Home() {
               </span>
               <span className="tt-num">
                 <b>{usd(t.priceWei, rate) ?? `${eth(t.priceWei, 3)} ETH`}</b>
-                {rate && <small> {eth(t.priceWei, 3)} ETH</small>}
               </span>
               <span className="tt-num tt-vol">
                 {t.windowVolumeWei && t.windowVolumeWei !== "0"

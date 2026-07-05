@@ -105,7 +105,7 @@ export default function BuyModal({
           <div className="bm-meta">
             <b>{track.title}</b>
             <span>by {track.artist.handle} · {track.left} of {track.maxSupply} left</span>
-            <em>{priceUsd ?? `${priceEth} ETH`}{priceUsd && <small> · {priceEth} ETH</small>}</em>
+            <em>{priceUsd ?? `${priceEth} ETH`}</em>
           </div>
         </div>
 
@@ -151,7 +151,7 @@ export default function BuyModal({
 
             <div className="bm-opt">
               <h4>Ξ PAY WITH CRYPTO <i>ETH</i></h4>
-              <p>Buy directly on-chain from your wallet ({priceEth} ETH + gas).</p>
+              <p>Buy directly on-chain from your wallet ({priceUsd ?? `${priceEth} ETH`}, paid in ETH + gas).</p>
               {!isConnected ? (
                 <button className="buy" onClick={() => openConnectModal?.()}>CONNECT WALLET</button>
               ) : !token ? (
@@ -160,7 +160,7 @@ export default function BuyModal({
                 </button>
               ) : (
                 <button className="buy" disabled={busy} onClick={payCrypto}>
-                  {busy ? "CONFIRMING…" : `BUY NOW · ${priceEth} ETH`}
+                  {busy ? "CONFIRMING…" : `BUY NOW · ${priceUsd ?? `${priceEth} ETH`}`}
                 </button>
               )}
             </div>

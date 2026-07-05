@@ -5,13 +5,11 @@ import Header from "@/components/Header";
 import { CoverArt } from "@/lib/art";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { useUsdRate, fmtEth } from "@/lib/usd";
 
 type Status = "idle" | "minting" | "done" | "error";
 
 export default function MintPage() {
   const { token, openAuth } = useAuth();
-  const rate = useUsdRate();
   const [title, setTitle] = useState("");
   const [genre, setGenre] = useState("");
   const [description, setDescription] = useState("");
@@ -59,7 +57,6 @@ export default function MintPage() {
   }
 
   const priceUsd = Number(price) || 0;
-  const priceEthEquiv = rate ? priceUsd / rate : 0;
 
   return (
     <div className="wrap">
@@ -88,7 +85,6 @@ export default function MintPage() {
               <label className="mint-field">
                 <span>PRICE (USD)</span>
                 <input type="number" min={0} step="any" value={price} onChange={(e) => setPrice(e.target.value)} />
-                {rate && priceUsd > 0 && <small className="mint-hint">≈ {fmtEth(BigInt(Math.round(priceEthEquiv * 1e18)).toString())} ETH on-chain</small>}
               </label>
             </div>
             <label className="mint-field"><span>ROYALTY % (MAX 10)</span><input type="number" min={0} max={10} step="0.5" value={royalty} onChange={(e) => setRoyalty(e.target.value)} /></label>

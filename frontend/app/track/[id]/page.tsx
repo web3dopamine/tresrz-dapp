@@ -245,7 +245,7 @@ export default function TrackPage() {
     if (!track) return;
     const res = await acceptOffer(o.id, track.id, o.qty);
     if (!res.ok) return toast(res.error);
-    toast(res.warn ? `⚠ ${res.warn}` : `Offer accepted — ${ethStr(o.unit * BigInt(o.qty))} ETH received ✓`);
+    toast(res.warn ? `⚠ ${res.warn}` : `Offer accepted — ${usd(o.unit * BigInt(o.qty), rate) ?? `${ethStr(o.unit * BigInt(o.qty))} ETH`} received ✓`);
     refreshChain();
   }
 
@@ -375,7 +375,7 @@ export default function TrackPage() {
                 {minting && <div className="os-minting">⏳ Finalizing on-chain — this track becomes buyable in a few seconds…</div>}
                 <span className="os-buy-label">BUY FOR</span>
                 {rate ? (
-                  <div className="os-price">{usd(track.priceWei, rate)} <small>{ethStr(track.priceWei)} ETH</small></div>
+                  <div className="os-price">{usd(track.priceWei, rate)}</div>
                 ) : (
                   <div className="os-price">{ethStr(track.priceWei)} <small>ETH</small></div>
                 )}
@@ -449,7 +449,7 @@ export default function TrackPage() {
                 ) : (
                   <div className="tk-panel os-panel">
                     {sparkPoints.length >= 2 && (
-                      <div className="tk-spark"><Sparkline points={sparkPoints} /><span>unit price trend (ETH)</span></div>
+                      <div className="tk-spark"><Sparkline points={sparkPoints} /><span>unit price trend</span></div>
                     )}
                     <ul className="tk-history">
                       {history.map((h, i) => (
@@ -480,7 +480,7 @@ export default function TrackPage() {
                       return (
                         <li key={l.id} className={editListing?.id === l.id ? "tk-editing" : undefined}>
                           <div className="tk-listing-row">
-                            <span><b>{l.qty}</b> edition{l.qty > 1 ? "s" : ""} @ <b>{usd(l.unit, rate) ?? `${ethStr(l.unit)} ETH`}</b>{rate && <small className="tk-seller"> ({ethStr(l.unit)} ETH)</small>}</span>
+                            <span><b>{l.qty}</b> edition{l.qty > 1 ? "s" : ""} @ <b>{usd(l.unit, rate) ?? `${ethStr(l.unit)} ETH`}</b></span>
                             <span className="tk-seller">seller {l.seller.slice(0, 6)}…{l.seller.slice(-4)}</span>
                             {mine ? (
                               <span className="tk-own-actions">
@@ -543,7 +543,7 @@ export default function TrackPage() {
                         return (
                           <li key={o.id}>
                             <div className="tk-listing-row">
-                              <span><b>{o.qty}</b> edition{o.qty > 1 ? "s" : ""} @ <b>{usd(o.unit, rate) ?? `${ethStr(o.unit)} ETH`}</b> <small className="tk-seller">({ethStr(o.unit * BigInt(o.qty))} ETH total, escrowed)</small></span>
+                              <span><b>{o.qty}</b> edition{o.qty > 1 ? "s" : ""} @ <b>{usd(o.unit, rate) ?? `${ethStr(o.unit)} ETH`}</b> <small className="tk-seller">({usd(o.unit * BigInt(o.qty), rate) ?? `${ethStr(o.unit * BigInt(o.qty))} ETH`} total, escrowed)</small></span>
                               <span className="tk-seller">from {o.buyer.slice(0, 6)}…{o.buyer.slice(-4)}</span>
                               {mine ? (
                                 <span className="tk-own-actions">
