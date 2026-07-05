@@ -127,6 +127,14 @@ export default function TrackPage() {
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 
+  // while a track is still confirming on-chain (background mint), poll until it's live
+  const minting = track?.mintStatus === "minting" && track?.chainTokenId == null;
+  useEffect(() => {
+    if (!minting) return;
+    const iv = setInterval(() => { api.track(id).then((t) => setTrack(t)).catch(() => {}); }, 6000);
+    return () => clearInterval(iv);
+  }, [minting, id]);
+
   const chainTokenId = track?.chainTokenId ?? null;
 
   // ---- on-chain reads: listings scan + owned balance ----
@@ -364,6 +372,7 @@ export default function TrackPage() {
 
               {/* buy panel */}
               <div className="os-buybox">
+                {minting && <div className="os-minting">⏳ Finalizing on-chain — this track becomes buyable in a few seconds…</div>}
                 <span className="os-buy-label">BUY FOR</span>
                 {rate ? (
                   <div className="os-price">{usd(track.priceWei, rate)} <small>{ethStr(track.priceWei)} ETH</small></div>
@@ -371,8 +380,8 @@ export default function TrackPage() {
                   <div className="os-price">{ethStr(track.priceWei)} <small>ETH</small></div>
                 )}
                 <div className="os-buy-actions">
-                  <button className="buy os-buynow" disabled={track.left === 0} onClick={() => setBuyOpen(true)}>
-                    {track.left === 0 ? "SOLD OUT" : "BUY NOW"}
+                  <button className="buy os-buynow" disabled={track.left === 0 || minting} onClick={() => setBuyOpen(true)}>
+                    {minting ? "FINALIZING…" : track.left === 0 ? "SOLD OUT" : "BUY NOW"}
                   </button>
                   <button
                     className="os-makeoffer"
@@ -627,6 +636,7 @@ export default function TrackPage() {
         .os-makeoffer:hover:not(:disabled) { border-color: var(--crimson, #f58426); box-shadow: var(--glow); }
         .os-makeoffer:disabled { opacity: .5; cursor: not-allowed; }
         .os-card { border-color: var(--crimson, #f58426); color: var(--crimson-soft, #ffa052); }
+        .os-minting { font-family: var(--mono, monospace); font-size: 11.5px; color: var(--crimson-soft, #ffa052); background: rgba(245,132,38,.1); border: 1px solid var(--card-line); border-radius: 8px; padding: 9px 11px; margin-bottom: 10px; }
         .os-offer-row { margin-top: 6px; }
         .os-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-top: 6px; }
         .os-tab { font-family: var(--mono, monospace); font-weight: 700; font-size: 12px; letter-spacing: 1.5px; color: var(--muted, #bec0c2); background: none; border: none; border-bottom: 2.5px solid transparent; padding: 11px 14px; cursor: pointer; transition: .2s; }

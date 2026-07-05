@@ -3,7 +3,7 @@ import multer from "multer";
 import { prisma } from "../db.js";
 import { requireAuth } from "../middleware/auth.js";
 import { pinFile, pinJSON, buildMetadata } from "../ipfs.js";
-import { platformMint, deliveryConfigured } from "../chain.js";
+import { submitMint, mintResult, deliveryConfigured } from "../chain.js";
 import { usdPerEth } from "./rate.js";
 
 // Wallet-free minting. The creator just fills a form; the PLATFORM wallet mints
@@ -88,36 +88,59 @@ r.post("/custodial", requireAuth, upload.fields([{ name: "audio", maxCount: 1 },
       if (free) await prisma.user.update({ where: { id: creator.id }, data: { handle } });
     }
 
-    // ---- 4) platform-mint on-chain (irreversible) ----
-    const mint = await platformMint({ maxSupply, priceWei, royaltyBps, metadataUri });
-    if (!mint.ok) return res.status(502).json({ error: "on-chain mint failed", reason: mint.reason });
+    // ---- 4) SUBMIT the on-chain mint without waiting (returns a tx hash fast) ----
+    const sub = await submitMint({ maxSupply, priceWei, royaltyBps, metadataUri });
+    if (!sub.ok) return res.status(502).json({ error: "could not submit on-chain mint", reason: sub.reason });
 
-    // ---- 5) persist the track. If this fails the NFT exists on-chain but has no
-    // Track row — log the recovery keys loudly and retry once before giving up. ----
-    let track;
-    const trackData = {
-      title: title.slice(0, 120), genre: genre.slice(0, 40), maxSupply, priceWei,
-      coverSeed, audioUrl: audioPin.url || null, audioCid: audioPin.cid || null,
-      coverUrl: imagePin?.url || null, metadataUri, mime: audio.mimetype,
-      chainTokenId: mint.trackId, txHash: mint.txHash, custodial: true, artistId: creator.id,
-    };
-    for (let attempt = 1; attempt <= 2 && !track; attempt++) {
-      try {
-        track = await prisma.track.create({ data: trackData, include: { artist: true, _count: { select: { likes: true } } } });
-      } catch (e) {
-        if (attempt === 2) {
-          console.error(`RECOVERY NEEDED: minted on-chain but Track insert failed. tokenId=${mint.trackId} tx=${mint.txHash} creator=${creator.id} metadataUri=${metadataUri} err=${e.message}`);
-          return res.status(500).json({ error: "minted on-chain but saving failed — support can recover it", chainTokenId: mint.trackId, txHash: mint.txHash });
-        }
-      }
-    }
+    // ---- 5) persist the track in a "minting" state; the reconciler fills in the
+    // tokenId once the tx confirms (usually ~15-30s). The request returns now. ----
+    const track = await prisma.track.create({
+      data: {
+        title: title.slice(0, 120), genre: genre.slice(0, 40), maxSupply, priceWei,
+        coverSeed, audioUrl: audioPin.url || null, audioCid: audioPin.cid || null,
+        coverUrl: imagePin?.url || null, metadataUri, mime: audio.mimetype,
+        chainTokenId: null, txHash: sub.hash, mintTx: sub.hash, mintStatus: "minting",
+        custodial: true, artistId: creator.id,
+      },
+      include: { artist: true, _count: { select: { likes: true } } },
+    });
 
-    res.status(201).json({ trackId: track.id, chainTokenId: mint.trackId, txHash: mint.txHash });
+    res.status(201).json({ trackId: track.id, txHash: sub.hash, status: "minting" });
   } catch (e) {
     if (e?.code === "P2002") return res.status(409).json({ error: "duplicate value" });
     console.error("custodial mint failed:", e);
     res.status(500).json({ error: "mint failed", detail: String(e.message || e) });
   }
 });
+
+// Background reconciler: finalizes "minting" tracks once their tx confirms —
+// sets the real chainTokenId (from the TrackMinted event) and flips to active,
+// or marks failed if the tx reverted. Runs every 12s.
+let mintTimer = null;
+export function startMintReconciler() {
+  if (mintTimer) return;
+  const tick = async () => {
+    try {
+      const pending = await prisma.track.findMany({
+        where: { mintStatus: "minting", mintTx: { not: null } },
+        take: 20, orderBy: { createdAt: "asc" },
+      });
+      for (const t of pending) {
+        const r = await mintResult(t.mintTx);
+        if (r.status === "success") {
+          await prisma.track.update({ where: { id: t.id }, data: { chainTokenId: r.tokenId, mintStatus: "active" } })
+            .catch((e) => console.error("mint finalize failed:", t.id, "token", r.tokenId, e.message));
+        } else if (r.status === "reverted") {
+          await prisma.track.update({ where: { id: t.id }, data: { mintStatus: "failed" } }).catch(() => {});
+          console.error("mint reverted for track", t.id, "tx", t.mintTx);
+        } // pending: leave for the next tick
+      }
+    } catch (e) {
+      console.error("mint reconciler tick failed:", e.message);
+    }
+  };
+  mintTimer = setInterval(tick, 12_000);
+  mintTimer.unref?.();
+}
 
 export default r;

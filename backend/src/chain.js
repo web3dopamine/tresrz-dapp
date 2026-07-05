@@ -102,22 +102,47 @@ const musicWriteAbi = [
 ];
 
 /**
- * Mint a track from the platform wallet (custodial creators have no wallet).
- * The platform is the on-chain artist; earnings are credited to the creator's
- * off-chain balance and paid out on withdrawal. Returns { ok, trackId, txHash }.
+ * SUBMIT a platform mint without waiting for the receipt — returns the tx hash
+ * immediately so the API can respond fast. A background reconciler resolves the
+ * tokenId later via mintResult(). The platform is the on-chain artist.
  */
-export async function platformMint({ maxSupply, priceWei, royaltyBps, metadataUri }) {
+export async function submitMint({ maxSupply, priceWei, royaltyBps, metadataUri }) {
   if (!deliveryConfigured) return { ok: false, reason: "platform mint wallet not configured" };
   try {
     const hash = await deliveryWallet.writeContract({
       address: MUSIC_CONTRACT, abi: musicWriteAbi, functionName: "mintTrack",
       args: [BigInt(maxSupply), BigInt(priceWei), BigInt(royaltyBps), metadataUri],
     });
-    const rc = await publicClient.waitForTransactionReceipt({ hash });
-    if (rc.status !== "success") return { ok: false, reason: "mint reverted", txHash: hash };
+    return { ok: true, hash };
+  } catch (e) {
+    return { ok: false, reason: String(e.shortMessage || e.message || e) };
+  }
+}
+
+/** Non-blocking result of a submitted mint: { status: success|reverted|pending, tokenId? }. */
+export async function mintResult(hash) {
+  if (!chainConfigured) return { status: "pending" };
+  try {
+    const rc = await publicClient.getTransactionReceipt({ hash });
+    if (rc.status !== "success") return { status: "reverted" };
     const ev = parseEventLogs({ abi: musicWriteAbi, eventName: "TrackMinted", logs: rc.logs })[0];
-    if (ev?.args?.trackId === undefined) return { ok: false, reason: "TrackMinted event missing", txHash: hash };
-    return { ok: true, trackId: Number(ev.args.trackId), txHash: hash };
+    if (ev?.args?.trackId === undefined) return { status: "reverted" };
+    return { status: "success", tokenId: Number(ev.args.trackId) };
+  } catch {
+    return { status: "pending" }; // not mined yet
+  }
+}
+
+/** Synchronous mint (submit + wait) — kept for scripts/tests. */
+export async function platformMint({ maxSupply, priceWei, royaltyBps, metadataUri }) {
+  const sub = await submitMint({ maxSupply, priceWei, royaltyBps, metadataUri });
+  if (!sub.ok) return sub;
+  try {
+    const rc = await publicClient.waitForTransactionReceipt({ hash: sub.hash });
+    if (rc.status !== "success") return { ok: false, reason: "mint reverted", txHash: sub.hash };
+    const ev = parseEventLogs({ abi: musicWriteAbi, eventName: "TrackMinted", logs: rc.logs })[0];
+    if (ev?.args?.trackId === undefined) return { ok: false, reason: "TrackMinted event missing", txHash: sub.hash };
+    return { ok: true, trackId: Number(ev.args.trackId), txHash: sub.hash };
   } catch (e) {
     return { ok: false, reason: String(e.shortMessage || e.message || e) };
   }

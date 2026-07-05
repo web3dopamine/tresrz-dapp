@@ -25,7 +25,7 @@ export default function MintPage() {
 
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
-  const [created, setCreated] = useState<{ id: string; chainTokenId: number | null } | null>(null);
+  const [created, setCreated] = useState<{ id: string } | null>(null);
 
   const busy = status === "minting";
   const valid = useMemo(() => {
@@ -50,7 +50,7 @@ export default function MintPage() {
       fd.append("audio", audioFile!);
       if (imageFile) fd.append("image", imageFile);
       const res = await api.custodialMint(fd);
-      setCreated({ id: res.trackId, chainTokenId: res.chainTokenId });
+      setCreated({ id: res.trackId });
       setStatus("done");
     } catch (err: any) {
       setError(err?.message || "Mint failed");
@@ -110,7 +110,7 @@ export default function MintPage() {
 
             {status === "done" && created && (
               <div className="mint-ok">
-                ✓ Minted as token #{created.chainTokenId}. <Link href={`/track/${created.id}`}>View track →</Link>
+                ✓ Minted! Finalizing on-chain (~30s) — it goes fully live automatically. <Link href={`/track/${created.id}`}>View track →</Link>
               </div>
             )}
           </form>

@@ -12,7 +12,7 @@ import streamRoutes from "./routes/stream.js";
 import adminRoutes from "./routes/admin.js";
 import rateRoutes from "./routes/rate.js";
 import fiatRoutes, { fiatWebhook, startFiatReconciler } from "./routes/fiat.js";
-import mintRoutes from "./routes/mint.js";
+import mintRoutes, { startMintReconciler } from "./routes/mint.js";
 import { UPLOAD_DIR } from "./ipfs.js";
 
 // Fail fast: a missing/placeholder JWT_SECRET means every token is forgeable.
@@ -96,4 +96,5 @@ const port = process.env.PORT || 4000;
 app.listen(port, () => {
   console.log(`TRESRZ API on :${port}`);
   startFiatReconciler(); // heals card orders stuck by crashes/timeouts
+  startMintReconciler(); // finalizes background mints once they confirm on-chain
 });

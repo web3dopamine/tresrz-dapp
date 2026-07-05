@@ -31,6 +31,7 @@ const shape = (t, userId) => ({
   hot: t.hot,
   flagged: t.flagged,
   custodial: t.custodial,
+  mintStatus: t.mintStatus,
   artist: artistShape(t.artist),
   likes: t._count?.likes ?? 0,
   liked: userId ? t.likes?.some((l) => l.userId === userId) : false,
@@ -41,8 +42,8 @@ const shape = (t, userId) => ({
 // GET /api/tracks?hot=true&genre=HOUSE&limit=10
 r.get("/", optionalAuth, async (req, res) => {
   const { hot, genre, limit, q } = req.query;
-  // hide moderated tracks — and tracks by moderated users — from public listings
-  const where = { flagged: false, artist: { flagged: false } };
+  // hide moderated tracks, moderated users, and tracks still confirming on-chain
+  const where = { flagged: false, artist: { flagged: false }, mintStatus: "active" };
   if (hot === "true") where.hot = true;
   if (genre) where.genre = String(genre).toUpperCase();
   if (q) {
@@ -85,7 +86,7 @@ r.get("/trending", optionalAuth, async (req, res) => {
   }
 
   const tracks = await prisma.track.findMany({
-    where: { flagged: false, artist: { flagged: false } },
+    where: { flagged: false, artist: { flagged: false }, mintStatus: "active" },
     include: { artist: true, _count: { select: { likes: true } }, likes: req.user ? { where: { userId: req.user.id } } : false },
   });
   const ranked = tracks

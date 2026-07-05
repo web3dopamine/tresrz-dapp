@@ -34,6 +34,7 @@ export type Track = {
   audioUrl?: string | null; coverUrl?: string | null; metadataUri?: string | null; mime?: string | null;
   hasFullAudio?: boolean;
   priceWei: string; maxSupply: number; minted: number; left: number; hot: boolean; flagged?: boolean;
+  custodial?: boolean; mintStatus?: string;
   artist: { id: string; handle: string; address: string; avatarSeed: number };
   likes: number; liked: boolean;
   txHash?: string | null; createdAt?: string;
@@ -96,7 +97,7 @@ export const api = {
 
   // custodial (wallet-less) minting + creator dashboard
   custodialStatus: (): Promise<{ enabled: boolean }> => req(`/api/mint/status`),
-  custodialMint: (form: FormData): Promise<{ trackId: string; chainTokenId: number; txHash: string }> => {
+  custodialMint: (form: FormData): Promise<{ trackId: string; txHash: string; status: string }> => {
     return fetch(`${BASE}/api/mint/custodial`, { method: "POST", body: form }).then(async (r) => {
       if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error || r.statusText);
       return r.json();

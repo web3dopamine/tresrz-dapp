@@ -60,6 +60,8 @@ model Track {
   hot          Boolean  @default(false)  // "featured" flag (admin-controlled)
   flagged      Boolean  @default(false)  // admin moderation flag (hidden from listings)
   custodial    Boolean  @default(false)  // minted by platform on behalf of a wallet-less creator
+  mintTx       String?                   // on-chain mint tx (set while awaiting confirmation)
+  mintStatus   String   @default("active") // active | minting (bg-confirming) | failed
   createdAt    DateTime @default(now())
   likes        Like[]
   sales        Sale[]
