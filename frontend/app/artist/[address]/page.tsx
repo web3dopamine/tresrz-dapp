@@ -38,14 +38,14 @@ export default function ArtistPage() {
                   <span><b>{artist.nftCount}</b> tracks</span>
                   <span><b>{artist.totalLikes}</b> total likes</span>
                 </div>
-                <p className="artist-bio">{artist.bio || `${artist.handle} is an independent artist minting limited-edition music on TRESRZ.`}</p>
+                <p className="artist-bio">{artist.bio || `${artist.handle} is an independent artist publishing limited-edition music on TRESRZ.`}</p>
               </div>
             </div>
 
             <div className="sec-title" style={{ marginTop: 30 }}>TRACKS</div>
             <div className="sec-bar" />
             {artist.tracks.length === 0 ? (
-              <div className="muted-note">This artist hasn’t minted any tracks yet.</div>
+              <div className="muted-note">This artist hasn’t published any tracks yet.</div>
             ) : (
               <div className="artist-grid">
                 {artist.tracks.map((t) => <TrackCard key={t.id} t={t} toast={toast} />)}

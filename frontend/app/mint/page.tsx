@@ -51,7 +51,7 @@ export default function MintPage() {
       setCreated({ id: res.trackId });
       setStatus("done");
     } catch (err: any) {
-      setError(err?.message || "Mint failed");
+      setError(err?.message || "Publish failed");
       setStatus("error");
     }
   }
@@ -62,17 +62,17 @@ export default function MintPage() {
     <div className="wrap">
       <Header />
       <section className="block">
-        <div className="sec-title">MINT A TRACK</div>
+        <div className="sec-title">PUBLISH A TRACK</div>
         <div className="sec-bar" />
 
         {!token ? (
           <div className="mint-gate">
-            <p>Log in to mint a track. It only takes a moment — email or Google, no wallet needed.</p>
+            <p>Log in to publish a track. It only takes a moment — email or Google, no wallet needed.</p>
             <button className="buy" style={{ width: "auto", padding: "12px 22px" }} onClick={openAuth}>SIGN UP / LOG IN</button>
           </div>
         ) : (
         <>
-        <p className="mint-lead">Fill in your track and hit mint — no wallet or crypto needed. It goes live on the marketplace and fans can buy editions with a card or crypto.</p>
+        <p className="mint-lead">Fill in your track and hit publish — no wallet or crypto needed. It goes live on the marketplace and fans can buy editions with a card or crypto.</p>
 
         <div className="mint-grid">
           <form className="mint-form" onSubmit={onSubmit}>
@@ -101,12 +101,12 @@ export default function MintPage() {
 
             {status === "error" && <div className="mint-err">{error}</div>}
             <button className="buy" type="submit" disabled={!valid || busy}>
-              {busy ? "MINTING…" : "MINT TRACK"}
+              {busy ? "PUBLISHING…" : "PUBLISH TRACK"}
             </button>
 
             {status === "done" && created && (
               <div className="mint-ok">
-                ✓ Minted! Finalizing on-chain (~30s) — it goes fully live automatically. <Link href={`/track/${created.id}`}>View track →</Link>
+                ✓ Published! Finalizing on-chain (~30s) — it goes fully live automatically. <Link href={`/track/${created.id}`}>View track →</Link>
               </div>
             )}
           </form>

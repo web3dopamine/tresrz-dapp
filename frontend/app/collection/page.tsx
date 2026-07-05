@@ -87,7 +87,7 @@ export default function CollectionPage() {
           <div className="sec-title">MY COLLECTION</div>
           <div className="sec-bar" />
           <div className="mint-gate">
-            <p>Log in to see the tracks you’ve minted — or connect a wallet to see editions you own on-chain.</p>
+            <p>Log in to see the tracks you’ve published — or connect a wallet to see editions you own on-chain.</p>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
               <button className="buy" style={{ width: "auto", padding: "12px 22px" }} onClick={openAuth}>SIGN UP / LOG IN</button>
               <ConnectButton showBalance={false} label="CONNECT WALLET" />
@@ -110,7 +110,7 @@ export default function CollectionPage() {
           {!loadedCreated ? (
             <div className="muted-note">Loading your tracks…</div>
           ) : created.length === 0 ? (
-            <div className="muted-note">You haven’t minted anything yet. <Link href="/mint" style={{ color: "var(--crimson-soft)" }}>Mint a track →</Link></div>
+            <div className="muted-note">You haven’t published anything yet. <Link href="/mint" style={{ color: "var(--crimson-soft)" }}>Publish a track →</Link></div>
           ) : (
             <div className="artist-grid">
               {created.map((track) => {
@@ -121,7 +121,7 @@ export default function CollectionPage() {
                     <Link href={`/track/${track.id}`} className="art" style={{ marginBottom: 11, textDecoration: "none", display: "block" }}>
                       <CoverArt seed={track.coverSeed} />
                       <div className="genre">{track.genre}</div>
-                      {minting && <span className="owned-badge" style={{ background: "rgba(245,132,38,.9)" }}>MINTING…</span>}
+                      {minting && <span className="owned-badge" style={{ background: "rgba(245,132,38,.9)" }}>PUBLISHING…</span>}
                       {failed && <span className="owned-badge" style={{ background: "rgba(200,40,40,.9)" }}>FAILED</span>}
                     </Link>
                     <h3>

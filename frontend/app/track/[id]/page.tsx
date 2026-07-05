@@ -442,11 +442,11 @@ export default function TrackPage() {
                         <li><span>Token ID</span><a href={`${EXPLORER}/token/${MUSIC_CONTRACT}?a=${chainTokenId}`} target="_blank" rel="noreferrer">#{chainTokenId} ↗</a></li>
                         <li><span>Token standard</span><b>ERC-1155</b></li>
                         {chainInfo && <li><span>Creator</span><Link href={`/artist/${chainInfo.artist}`}>{shortAddr(chainInfo.artist)}</Link></li>}
-                        {track.createdAt && <li><span>Minted</span><b>{new Date(track.createdAt).toLocaleString()}</b></li>}
-                        {track.txHash && <li><span>Mint tx</span><a href={`${EXPLORER}/tx/${track.txHash}`} target="_blank" rel="noreferrer">{track.txHash.slice(0, 10)}… ↗</a></li>}
+                        {track.createdAt && <li><span>Published</span><b>{new Date(track.createdAt).toLocaleString()}</b></li>}
+                        {track.txHash && <li><span>Publish tx</span><a href={`${EXPLORER}/tx/${track.txHash}`} target="_blank" rel="noreferrer">{track.txHash.slice(0, 10)}… ↗</a></li>}
                       </ul>
                       <a className="tk-explorer-link" href={`${EXPLORER}/token/${MUSIC_CONTRACT}?a=${chainTokenId}`} target="_blank" rel="noreferrer">
-                        View mint &amp; full transfer history on {EXPLORER_NAME} ↗
+                        View publish &amp; full transfer history on {EXPLORER_NAME} ↗
                       </a>
                     </div>
                   )}

@@ -36,7 +36,7 @@ export default function Header({ search, setSearch }: { search?: string; setSear
         <Link href="/#hot">MARKETPLACE</Link>
         <Link href="/#latest">SUGGESTED</Link>
         <Link href="/#popular">ARTISTS</Link>
-        <Link href="/mint">MINT</Link>
+        <Link href="/mint">PUBLISH</Link>
         <Link href="/collection">COLLECTION</Link>
         {isConnected && address && <Link href={`/profile/${address}`}>PROFILE</Link>}
         {isAdmin && <Link href="/admin">ADMIN</Link>}
@@ -58,7 +58,7 @@ export default function Header({ search, setSearch }: { search?: string; setSear
           <Link href="/#hot">MARKETPLACE</Link>
           <Link href="/#latest">SUGGESTED</Link>
           <Link href="/#popular">ARTISTS</Link>
-          <Link href="/mint">MINT</Link>
+          <Link href="/mint">PUBLISH</Link>
           <Link href="/collection">COLLECTION</Link>
           {isConnected && address && <Link href={`/profile/${address}`}>PROFILE</Link>}
           {isAdmin && <Link href="/admin">ADMIN</Link>}

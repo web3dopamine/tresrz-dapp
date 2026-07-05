@@ -4,7 +4,7 @@ import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: "TRESRZ — Music NFT Marketplace",
-  description: "Own the sound. Mint, collect and stream music NFTs.",
+  description: "Own the sound. Publish, collect and stream music NFTs.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

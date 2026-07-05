@@ -239,7 +239,7 @@ export default function Home() {
         <div className="foot-top">
           <div className="foot-brand">
             <div className="logo"><div className="bars"><span /><span /><span /><span /></div><b>TRES<span>RZ</span></b></div>
-            <p>The marketplace where music becomes property. Mint your masters, sell limited editions, and let fans truly own the sound.</p>
+            <p>The marketplace where music becomes property. Publish your masters, sell limited editions, and let fans truly own the sound.</p>
           </div>
           <div className="foot-col"><h5>MARKET</h5><a href="#hot">Explore</a><a href="#latest">Suggested</a><a href="#popular">Top artists</a><a href="#genres">Genres</a></div>
           <div className="foot-col"><h5>CREATE</h5><Link href="/mint">Mint a track</Link><Link href="/about#royalties">Royalties</Link><Link href="/about#docs">How it works</Link><Link href="/collection">Your collection</Link></div>
