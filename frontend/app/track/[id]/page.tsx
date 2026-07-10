@@ -425,6 +425,24 @@ export default function TrackPage() {
               {/* ---- DETAILS tab: traits grid + on-chain list ---- */}
               {tab === "details" && (
                 <>
+                  {/* metadata traits (OpenSea-style, with collection rarity) */}
+                  {track.attributes && track.attributes.length > 0 && (
+                    <>
+                      <div className="os-sub">TRAITS</div>
+                      <div className="os-attrs">
+                        {track.attributes.map((a, i) => (
+                          <div key={i} className="os-attr">
+                            <span className="os-attr-type">{a.trait_type}</span>
+                            <b className="os-attr-val" title={String(a.value)}>{String(a.value)}</b>
+                            {(a.pct != null || a.frequency) && (
+                              <span className="os-attr-rare">{a.pct != null ? `${a.pct}% have this` : a.frequency}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="os-sub" style={{ marginTop: 18 }}>DETAILS</div>
+                    </>
+                  )}
                   <div className="os-traits">
                     <div className="os-trait"><span>GENRE</span><b>{track.genre}</b></div>
                     <div className="os-trait"><span>EDITION SIZE</span><b>{track.maxSupply}</b></div>
@@ -659,6 +677,11 @@ export default function TrackPage() {
         .os-trait b { font-size: 13px; color: var(--ink, #fff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .os-panel { margin-top: 0; }
         .os-sub { font-family: var(--mono, monospace); font-size: 11px; letter-spacing: .08em; color: var(--muted, #bec0c2); margin: 0 0 8px; text-transform: uppercase; }
+        .os-attrs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 4px; }
+        .os-attr { background: rgba(245,132,38,.07); border: 1px solid var(--card-line); border-radius: 10px; padding: 11px 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; text-align: center; align-items: center; }
+        .os-attr-type { font-family: var(--mono, monospace); font-size: 9px; letter-spacing: 1px; color: var(--crimson-soft, #ffa052); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+        .os-attr-val { font-size: 13px; color: var(--ink, #fff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+        .os-attr-rare { font-family: var(--mono, monospace); font-size: 10px; color: var(--muted, #bec0c2); }
         @media (max-width: 900px) {
           .os-grid { grid-template-columns: 1fr; gap: 22px; }
           .os-media { position: static; }

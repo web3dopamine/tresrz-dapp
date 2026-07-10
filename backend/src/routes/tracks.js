@@ -4,6 +4,40 @@ import { requireAuth, optionalAuth } from "../middleware/auth.js";
 
 const r = Router();
 
+// --- collection trait rarity ---------------------------------------------
+// OpenSea-style: for each (trait_type, value) in a creator's collection, how
+// many items share it. Computed once per artist via a grouped jsonb query and
+// cached for 5 min (a 9k-item collection groups in ms, but this avoids doing it
+// on every item view).
+const traitCache = new Map(); // artistId -> { at, total, map: {trait_type: {value: count}} }
+async function traitDistribution(artistId) {
+  const hit = traitCache.get(artistId);
+  if (hit && Date.now() - hit.at < 5 * 60_000) return hit;
+  const rows = await prisma.$queryRawUnsafe(
+    `SELECT elem->>'trait_type' AS tt, elem->>'value' AS val, COUNT(*)::int AS cnt
+     FROM "Track", jsonb_array_elements(attributes) elem
+     WHERE "artistId" = $1 AND attributes IS NOT NULL AND flagged = false
+     GROUP BY 1, 2`,
+    artistId,
+  );
+  const total = await prisma.track.count({ where: { artistId, flagged: false, attributes: { not: null } } });
+  const map = {};
+  for (const row of rows) { (map[row.tt] ||= {})[row.val] = Number(row.cnt); }
+  const entry = { at: Date.now(), total, map };
+  traitCache.set(artistId, entry);
+  return entry;
+}
+
+// Attach OpenSea-style rarity (count + % of collection) to each attribute.
+async function withTraitRarity(attributes, artistId) {
+  if (!Array.isArray(attributes) || !attributes.length) return attributes || null;
+  const dist = await traitDistribution(artistId);
+  return attributes.map((a) => {
+    const cnt = dist.map[a.trait_type]?.[a.value] ?? null;
+    return { ...a, count: cnt, pct: cnt && dist.total ? Number(((100 * cnt) / dist.total).toFixed(2)) : null };
+  });
+}
+
 // Display shape for an artist that may be a custodial (wallet-less) creator:
 // no address, so fall back to the creator id for profile links and derive a
 // handle from handle -> email prefix -> short address/id.
@@ -156,7 +190,9 @@ r.get("/:id", optionalAuth, async (req, res) => {
     include: { artist: true, _count: { select: { likes: true } }, likes: req.user ? { where: { userId: req.user.id } } : false },
   });
   if (!t) return res.status(404).json({ error: "not found" });
-  res.json(shape(t, req.user?.id));
+  // detail view carries the full trait list with collection rarity (OpenSea-style)
+  const attributes = await withTraitRarity(t.attributes, t.artistId).catch(() => t.attributes || null);
+  res.json({ ...shape(t, req.user?.id), attributes, externalUrl: t.externalUrl });
 });
 
 // POST /api/tracks  (after on-chain mint, persist metadata)

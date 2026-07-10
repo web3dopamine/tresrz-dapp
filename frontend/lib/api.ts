@@ -35,12 +35,14 @@ export type Track = {
   hasFullAudio?: boolean;
   priceWei: string; maxSupply: number; minted: number; left: number; hot: boolean; flagged?: boolean;
   custodial?: boolean; mintStatus?: string; rarity?: string | null;
+  attributes?: Array<{ trait_type: string; value: any; count?: number | null; pct?: number | null; frequency?: string }> | null;
+  externalUrl?: string | null;
   artist: { id: string; handle: string; address: string; avatarSeed: number };
   likes: number; liked: boolean;
   txHash?: string | null; createdAt?: string;
 };
 export type Artist = { id: string; handle: string; address: string; avatarSeed: number; nftCount: number; likes: number };
-export type ArtistDetail = { id: string; handle: string; address: string; avatarSeed: number; bio: string | null; nftCount: number; totalLikes: number; tracks: Track[] };
+export type ArtistDetail = { id: string; handle: string; address: string; avatarSeed: number; bio: string | null; nftCount: number; totalLikes: number; tracks: Track[]; collectionName?: string | null; floorWei?: string | null };
 export type SaleHistory = {
   kind: string; qty: number; priceWei: string; unitWei: string; txHash: string;
   buyer: string | null; seller: string | null; at: string;

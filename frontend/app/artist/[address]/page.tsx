@@ -6,6 +6,7 @@ import Header from "@/components/Header";
 import TrackCard from "@/components/TrackCard";
 import { avatarUrl } from "@/lib/art";
 import { api, type ArtistDetail, type Track } from "@/lib/api";
+import { usd, useUsdRate } from "@/lib/usd";
 
 const PAGE = 24;
 
@@ -19,6 +20,7 @@ export default function ArtistPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [done, setDone] = useState(false);
   const [msg, setMsg] = useState("");
+  const rate = useUsdRate();
   const tRef = useRef<any>(null);
   function toast(m: string) { setMsg(m); clearTimeout(tRef.current); tRef.current = setTimeout(() => setMsg(""), 2200); }
 
@@ -64,17 +66,20 @@ export default function ArtistPage() {
             <div className="artist-header">
               <img src={avatarUrl(artist.avatarSeed)} alt="" />
               <div className="artist-meta">
-                <h1>{artist.handle}</h1>
+                {artist.collectionName && <div className="coll-eyebrow">COLLECTION</div>}
+                <h1>{artist.collectionName || artist.handle}</h1>
+                {artist.collectionName && <div className="coll-by">by <b>{artist.handle}</b></div>}
                 <div className="artist-addr">{artist.address}</div>
                 <div className="artist-counts">
-                  <span><b>{artist.nftCount.toLocaleString()}</b> tracks</span>
-                  <span><b>{artist.totalLikes.toLocaleString()}</b> total likes</span>
+                  <span><b>{artist.nftCount.toLocaleString()}</b> items</span>
+                  {artist.floorWei && rate && usd(artist.floorWei, rate) && <span>floor <b>{usd(artist.floorWei, rate)}</b></span>}
+                  <span><b>{artist.totalLikes.toLocaleString()}</b> likes</span>
                 </div>
-                <p className="artist-bio">{artist.bio || `${artist.handle} is an independent artist publishing limited-edition music on TRESRZ.`}</p>
+                <p className="artist-bio">{artist.bio || (artist.collectionName ? `${artist.collectionName} — a ${artist.nftCount.toLocaleString()}-piece collection by ${artist.handle} on TRESRZ.` : `${artist.handle} is an independent artist publishing limited-edition music on TRESRZ.`)}</p>
               </div>
             </div>
 
-            <div className="sec-title" style={{ marginTop: 30 }}>TRACKS</div>
+            <div className="sec-title" style={{ marginTop: 30 }}>{artist.collectionName ? "ITEMS" : "TRACKS"}</div>
             <div className="sec-bar" />
 
             {/* rarity filter chips */}
@@ -119,6 +124,9 @@ export default function ArtistPage() {
         .rf-chip.on span { opacity: .85; color: #fff; }
         .rf-more { display: flex; justify-content: center; margin: 26px 0 4px; }
         .rf-loadmore { width: auto; padding: 11px 30px; }
+        .coll-eyebrow { font-family: var(--mono, monospace); font-size: 11px; letter-spacing: .18em; color: var(--crimson, #f58426); font-weight: 700; margin-bottom: 4px; }
+        .coll-by { font-size: 13px; color: var(--muted); margin: 2px 0 4px; }
+        .coll-by b { color: var(--ink); }
       `}</style>
     </div>
   );

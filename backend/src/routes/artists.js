@@ -70,6 +70,22 @@ r.get("/:key", optionalAuth, async (req, res) => {
     if (!user) return res.status(404).json({ error: "artist not found" });
     const tracks = user.tracks.map((t) => shapeTrack(t, req.user?.id));
     const totalLikes = user._count.tracks ? await prisma.like.count({ where: { track: { artistId: user.id } } }) : 0;
+
+    // collection framing: name from the dominant "Project" trait, floor = cheapest listed
+    let collectionName = null, floorWei = null;
+    if (user._count.tracks > 0) {
+      try {
+        const proj = await prisma.$queryRawUnsafe(
+          `SELECT elem->>'value' AS val, COUNT(*)::int AS cnt FROM "Track", jsonb_array_elements(attributes) elem
+           WHERE "artistId"=$1 AND attributes IS NOT NULL AND elem->>'trait_type'='Project' GROUP BY 1 ORDER BY 2 DESC LIMIT 1`, user.id);
+        collectionName = proj[0]?.val || null;
+        const floor = await prisma.$queryRawUnsafe(
+          `SELECT MIN(CAST("priceWei" AS NUMERIC))::text AS floor FROM "Track"
+           WHERE "artistId"=$1 AND flagged=false AND "mintStatus" IN ('active','minting','publishing')`, user.id);
+        floorWei = floor[0]?.floor || null;
+      } catch {}
+    }
+
     res.json({
       id: user.id,
       handle: displayHandle(user),
@@ -79,6 +95,8 @@ r.get("/:key", optionalAuth, async (req, res) => {
       custodial: user.custodial,
       nftCount: user._count.tracks,
       totalLikes,
+      collectionName,   // e.g. "THE BITCOIN RAP" — present => render as a collection
+      floorWei,
       tracks,   // first page only; use /api/tracks?artist=<id> for the rest
     });
   } catch (e) {
