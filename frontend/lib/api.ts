@@ -34,7 +34,7 @@ export type Track = {
   audioUrl?: string | null; coverUrl?: string | null; metadataUri?: string | null; mime?: string | null;
   hasFullAudio?: boolean;
   priceWei: string; maxSupply: number; minted: number; left: number; hot: boolean; flagged?: boolean;
-  custodial?: boolean; mintStatus?: string;
+  custodial?: boolean; mintStatus?: string; rarity?: string | null;
   artist: { id: string; handle: string; address: string; avatarSeed: number };
   likes: number; liked: boolean;
   txHash?: string | null; createdAt?: string;
@@ -63,6 +63,7 @@ export const api = {
   myTracks: (): Promise<Track[]> => req(`/api/tracks/mine`),
   artists: (): Promise<Artist[]> => req(`/api/artists`),
   artist: (key: string): Promise<ArtistDetail> => req(`/api/artists/${key}`),
+  rarities: (artistId: string): Promise<{ rarity: string; count: number }[]> => req(`/api/tracks/rarities?artist=${artistId}`),
   nonce: (address: string): Promise<{ nonce: string }> => req(`/api/auth/nonce?address=${address}`),
   verify: (message: string, signature: string) => req(`/api/auth/verify`, { method: "POST", body: JSON.stringify({ message, signature }) }),
   me: (): Promise<{ user: any; isAdmin: boolean }> => req(`/api/auth/me`),

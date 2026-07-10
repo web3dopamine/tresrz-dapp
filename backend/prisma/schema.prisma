@@ -51,6 +51,10 @@ model Track {
   coverUrl     String?                   // cover image URL (IPFS/local), optional
   metadataUri  String?                   // ipfs:// or URL of ERC-721 metadata JSON
   mime         String?                   // audio mime type (e.g. audio/mpeg)
+  externalUrl  String?                   // source/animation gateway URL for imported collections
+  attributes   Json?                     // full trait list from imported metadata (OpenSea attributes[])
+  rarity       String?                   // rarity tier (COMMON/RARE/ULTRA RARE...) for filtering
+  @@index([rarity])
   priceWei     String   @default("0")    // primary price per edition (wei, string for bigint)
   maxSupply    Int
   minted       Int      @default(0)

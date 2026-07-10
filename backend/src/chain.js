@@ -96,6 +96,9 @@ const musicWriteAbi = [
   { type: "function", name: "mintTrack", stateMutability: "nonpayable", inputs: [
     { name: "maxSupply", type: "uint64" }, { name: "price", type: "uint96" }, { name: "royaltyBps", type: "uint96" }, { name: "metadataUri", type: "string" }],
     outputs: [{ name: "trackId", type: "uint256" }] },
+  { type: "function", name: "batchMintTracks", stateMutability: "nonpayable", inputs: [
+    { name: "maxSupplies", type: "uint64[]" }, { name: "prices", type: "uint96[]" }, { name: "royaltyBpsList", type: "uint96[]" }, { name: "metadataUris", type: "string[]" }],
+    outputs: [{ name: "firstTrackId", type: "uint256" }, { name: "count", type: "uint256" }] },
   { type: "event", name: "TrackMinted", inputs: [
     { name: "trackId", type: "uint256", indexed: true }, { name: "artist", type: "address", indexed: true },
     { name: "maxSupply", type: "uint64", indexed: false }, { name: "price", type: "uint96", indexed: false }, { name: "uri", type: "string", indexed: false }] },
@@ -128,6 +131,47 @@ export async function mintResult(hash) {
     const ev = parseEventLogs({ abi: musicWriteAbi, eventName: "TrackMinted", logs: rc.logs })[0];
     if (ev?.args?.trackId === undefined) return { status: "reverted" };
     return { status: "success", tokenId: Number(ev.args.trackId) };
+  } catch {
+    return { status: "pending" }; // not mined yet
+  }
+}
+
+/**
+ * Register MANY tracks in a single tx (bulk collection import). `items` is an
+ * array of { maxSupply, priceWei, royaltyBps, metadataUri }. Returns the tx hash;
+ * resolve the assigned tokenIds with batchMintResult(hash).
+ */
+export async function submitBatchMint(items) {
+  if (!deliveryConfigured) return { ok: false, reason: "platform mint wallet not configured" };
+  try {
+    const hash = await deliveryWallet.writeContract({
+      address: MUSIC_CONTRACT, abi: musicWriteAbi, functionName: "batchMintTracks",
+      args: [
+        items.map((x) => BigInt(x.maxSupply || 1)),
+        items.map((x) => BigInt(x.priceWei || 0)),
+        items.map((x) => BigInt(x.royaltyBps || 0)),
+        items.map((x) => x.metadataUri),
+      ],
+    });
+    return { ok: true, hash, count: items.length };
+  } catch (e) {
+    return { ok: false, reason: String(e.shortMessage || e.message || e) };
+  }
+}
+
+/**
+ * Result of a batch mint: { status, tokenIds: [...] } where tokenIds are in the
+ * SAME order as the submitted items (the contract assigns contiguous ids and
+ * emits one TrackMinted per item in order).
+ */
+export async function batchMintResult(hash) {
+  if (!chainConfigured) return { status: "pending" };
+  try {
+    const rc = await publicClient.getTransactionReceipt({ hash });
+    if (rc.status !== "success") return { status: "reverted" };
+    const evs = parseEventLogs({ abi: musicWriteAbi, eventName: "TrackMinted", logs: rc.logs });
+    const tokenIds = evs.map((e) => Number(e.args.trackId)).sort((a, b) => a - b);
+    return { status: "success", tokenIds };
   } catch {
     return { status: "pending" }; // not mined yet
   }

@@ -50,6 +50,30 @@ contract TresrzMusic is ERC1155, ERC2981, Ownable, ReentrancyGuard {
         emit TrackMinted(trackId, msg.sender, maxSupply, price, metadataUri);
     }
 
+    /// @notice Register many tracks in a single transaction (bulk collection
+    ///         import). One base tx cost instead of N, and ~100x fewer txs.
+    ///         All four arrays must be the same length. Returns the first
+    ///         assigned trackId and the count minted (ids are contiguous).
+    function batchMintTracks(
+        uint64[] calldata maxSupplies,
+        uint96[] calldata prices,
+        uint96[] calldata royaltyBpsList,
+        string[] calldata metadataUris
+    ) external returns (uint256 firstTrackId, uint256 count) {
+        count = metadataUris.length;
+        require(count > 0, "empty");
+        require(maxSupplies.length == count && prices.length == count && royaltyBpsList.length == count, "len mismatch");
+        firstTrackId = nextTrackId;
+        for (uint256 i = 0; i < count; i++) {
+            require(maxSupplies[i] > 0, "supply=0");
+            require(royaltyBpsList[i] <= 1000, "royalty>10%");
+            uint256 trackId = nextTrackId++;
+            tracks[trackId] = Track(msg.sender, prices[i], maxSupplies[i], 0, metadataUris[i], true);
+            _setTokenRoyalty(trackId, msg.sender, royaltyBpsList[i]);
+            emit TrackMinted(trackId, msg.sender, maxSupplies[i], prices[i], metadataUris[i]);
+        }
+    }
+
     /// @notice Buy `qty` editions of a track on the primary market.
     function buy(uint256 trackId, uint64 qty) external payable nonReentrant {
         Track storage t = tracks[trackId];

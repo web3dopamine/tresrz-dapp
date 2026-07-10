@@ -32,6 +32,7 @@ const shape = (t, userId) => ({
   flagged: t.flagged,
   custodial: t.custodial,
   mintStatus: t.mintStatus,
+  rarity: t.rarity,
   artist: artistShape(t.artist),
   likes: t._count?.likes ?? 0,
   liked: userId ? t.likes?.some((l) => l.userId === userId) : false,
@@ -41,13 +42,15 @@ const shape = (t, userId) => ({
 
 // GET /api/tracks?hot=true&genre=HOUSE&limit=10
 r.get("/", optionalAuth, async (req, res) => {
-  const { hot, genre, limit, q } = req.query;
+  const { hot, genre, limit, q, rarity, artist, skip } = req.query;
   // hide moderated tracks + users and failed publishes; show live tracks plus ones
   // still finalizing in the background (publishing/minting) so a fresh publish
   // appears on the marketplace instantly (buying is gated until it's on-chain).
   const where = { flagged: false, artist: { flagged: false }, mintStatus: { in: ["active", "minting", "publishing"] } };
   if (hot === "true") where.hot = true;
   if (genre) where.genre = String(genre).toUpperCase();
+  if (rarity) where.rarity = String(rarity).toUpperCase();          // COMMON | RARE | ULTRA RARE
+  if (artist) where.artistId = String(artist);                       // scope to one creator's collection
   if (q) {
     // server-side search across title + artist handle/address
     where.OR = [
@@ -58,7 +61,8 @@ r.get("/", optionalAuth, async (req, res) => {
   }
   const tracks = await prisma.track.findMany({
     where,
-    take: limit ? Number(limit) : 50,
+    take: Math.min(limit ? Number(limit) : 50, 100),                 // cap page size
+    skip: skip ? Number(skip) : 0,                                    // pagination offset
     orderBy: { createdAt: "desc" },
     include: { artist: true, _count: { select: { likes: true } }, likes: req.user ? { where: { userId: req.user.id } } : false },
   });
@@ -128,6 +132,15 @@ r.get("/trending", optionalAuth, async (req, res) => {
 // includes tracks still confirming on-chain (mintStatus "minting") and failed
 // ones, so a creator always sees everything they've minted. Must be registered
 // before /:id or "mine" is parsed as a track id.
+// GET /api/tracks/rarities?artist=<id>  -> [{rarity, count}] for filter chips.
+// Registered before /:id so "rarities" isn't parsed as a track id.
+r.get("/rarities", async (req, res) => {
+  const where = { flagged: false, artist: { flagged: false }, mintStatus: { in: ["active", "minting", "publishing"] }, rarity: { not: null } };
+  if (req.query.artist) where.artistId = String(req.query.artist);
+  const groups = await prisma.track.groupBy({ by: ["rarity"], where, _count: { rarity: true } });
+  res.json(groups.map((g) => ({ rarity: g.rarity, count: g._count.rarity })).sort((a, b) => b.count - a.count));
+});
+
 r.get("/mine", requireAuth, async (req, res) => {
   const tracks = await prisma.track.findMany({
     where: { artistId: req.user.id },
