@@ -14,6 +14,7 @@ import rateRoutes from "./routes/rate.js";
 import fiatRoutes, { fiatWebhook, startFiatReconciler } from "./routes/fiat.js";
 import mintRoutes, { startMintReconciler } from "./routes/mint.js";
 import mediaRoutes from "./routes/media.js";
+import collectionRoutes from "./routes/collections.js";
 import { UPLOAD_DIR } from "./ipfs.js";
 
 // Fail fast: a missing/placeholder JWT_SECRET means every token is forgeable.
@@ -82,6 +83,7 @@ app.use("/api/upload", strictLimiter, uploadRoutes);
 app.use("/api/stream", streamRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/rate", rateRoutes);
+app.use("/api/collections", collectionRoutes);
 app.use("/api/fiat", strictLimiter, fiatRoutes);
 app.use("/api/mint", mintLimiter, mintRoutes);
 

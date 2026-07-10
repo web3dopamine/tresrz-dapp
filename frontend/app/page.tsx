@@ -8,7 +8,7 @@ import DropCard from "@/components/DropCard";
 import CookieBanner from "@/components/CookieBanner";
 import BuyModal from "@/components/BuyModal";
 import { CoverArt, avatarUrl } from "@/lib/art";
-import { api, type Track, type Artist, type TrendingTrack, type TrendWindow } from "@/lib/api";
+import { api, type Track, type Artist, type Collection, type TrendingTrack, type TrendWindow } from "@/lib/api";
 import { useUsdRate, usd } from "@/lib/usd";
 
 // Fallback demo data so the UI renders even before the backend/seed is up
@@ -37,6 +37,7 @@ export default function Home() {
   const [msg, setMsg] = useState("");
   const [trendWindow, setTrendWindow] = useState<TrendWindow>("1d");
   const [trendRows, setTrendRows] = useState<TrendingTrack[] | null>(null);
+  const [collections, setCollections] = useState<Collection[]>([]);
   const tRef = useRef<any>(null);
   const rate = useUsdRate();
   const [buyTrack, setBuyTrack] = useState<Track | null>(null);
@@ -47,6 +48,7 @@ export default function Home() {
     api.tracks("?hot=true").then((d) => d.length && setHot(d)).catch(() => {});
     api.tracks("?limit=12").then((d) => d.length && setLatest(d)).catch(() => {});
     api.artists().then((d) => d.length && setArtists(d)).catch(() => {});
+    api.collections(12).then((d) => setCollections(d)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -126,31 +128,42 @@ export default function Home() {
         ))}
       </div>
 
-      {/* ---- hot tracks: continuously drifting marquee ---- */}
-      <section className="me-block">
-        <div className="sec-head">
-          <div className="sec-title">HOT TRACKS</div>
-          <span className="sec-more">hover to pause</span>
-        </div>
-        {fHot.length === 0 ? (
-          <div className="muted-note">No hot tracks match your search/filter.</div>
-        ) : fHot.length >= 3 ? (
-          <div className="marquee">
-            <div className="marquee-track" style={{ ["--mq-dur" as any]: `${fHot.length * 8}s` }}>
-              <div className="mq-set">
-                {fHot.map((t) => <div className="mq-item" key={t.id}><TrackCard t={t} toast={toast} /></div>)}
-              </div>
-              <div className="mq-set" aria-hidden>
-                {fHot.map((t) => <div className="mq-item" key={`${t.id}-b`}><TrackCard t={t} toast={toast} /></div>)}
-              </div>
-            </div>
+      {/* ---- collections (OpenSea-style) ---- */}
+      {collections.length > 0 && (
+        <section className="me-block" id="collections">
+          <div className="sec-head">
+            <div className="sec-title">COLLECTIONS</div>
+            <Link className="sec-more" href="/#popular">all creators →</Link>
           </div>
-        ) : (
-          <div className="h-row">
-            {fHot.map((t) => <TrackCard key={t.id} t={t} toast={toast} />)}
+          <div className="coll-grid">
+            {collections.map((c) => {
+              const cells = [...c.covers];
+              while (cells.length < 4) cells.push({ coverSeed: c.avatarSeed + cells.length * 7, coverUrl: null });
+              return (
+                <Link key={c.id} href={`/artist/${c.address}`} className="coll-card">
+                  <div className="coll-covers">
+                    {cells.slice(0, 4).map((cv, i) => (
+                      <div key={i} className="coll-cell">
+                        {cv.coverUrl ? <img src={cv.coverUrl} alt="" loading="lazy" /> : <CoverArt seed={cv.coverSeed} />}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="coll-info">
+                    <img className="coll-av" src={avatarUrl(c.avatarSeed)} alt="" />
+                    <div className="coll-meta">
+                      <b>{c.name}</b>
+                      <div className="coll-stats">
+                        <span>{c.itemCount.toLocaleString()} items</span>
+                        {c.floorWei && rate && usd(c.floorWei, rate) && <span>floor {usd(c.floorWei, rate)}</span>}
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
       {/* ---- trending table ---- */}
       <section className="me-block">
@@ -221,6 +234,32 @@ export default function Home() {
         {fLatest.length === 0 ? <div className="muted-note">No tracks match your search/filter.</div> : (
           <div className="h-row">
             {fLatest.map((t) => <DropCard key={t.id} t={t} />)}
+          </div>
+        )}
+      </section>
+
+      {/* ---- hot tracks: continuously drifting marquee (moved to bottom) ---- */}
+      <section className="me-block">
+        <div className="sec-head">
+          <div className="sec-title">HOT TRACKS</div>
+          <span className="sec-more">hover to pause</span>
+        </div>
+        {fHot.length === 0 ? (
+          <div className="muted-note">No hot tracks match your search/filter.</div>
+        ) : fHot.length >= 3 ? (
+          <div className="marquee">
+            <div className="marquee-track" style={{ ["--mq-dur" as any]: `${fHot.length * 8}s` }}>
+              <div className="mq-set">
+                {fHot.map((t) => <div className="mq-item" key={t.id}><TrackCard t={t} toast={toast} /></div>)}
+              </div>
+              <div className="mq-set" aria-hidden>
+                {fHot.map((t) => <div className="mq-item" key={`${t.id}-b`}><TrackCard t={t} toast={toast} /></div>)}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="h-row">
+            {fHot.map((t) => <TrackCard key={t.id} t={t} toast={toast} />)}
           </div>
         )}
       </section>

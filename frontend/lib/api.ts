@@ -42,6 +42,7 @@ export type Track = {
   txHash?: string | null; createdAt?: string;
 };
 export type Artist = { id: string; handle: string; address: string; avatarSeed: number; nftCount: number; likes: number };
+export type Collection = { id: string; name: string; handle: string; address: string; avatarSeed: number; itemCount: number; floorWei: string | null; covers: { coverSeed: number; coverUrl: string | null }[] };
 export type ArtistDetail = { id: string; handle: string; address: string; avatarSeed: number; bio: string | null; nftCount: number; totalLikes: number; tracks: Track[]; collectionName?: string | null; floorWei?: string | null };
 export type SaleHistory = {
   kind: string; qty: number; priceWei: string; unitWei: string; txHash: string;
@@ -64,6 +65,7 @@ export const api = {
   track: (id: string): Promise<Track> => req(`/api/tracks/${id}`),
   myTracks: (): Promise<Track[]> => req(`/api/tracks/mine`),
   artists: (): Promise<Artist[]> => req(`/api/artists`),
+  collections: (limit = 12): Promise<Collection[]> => req(`/api/collections?limit=${limit}`),
   artist: (key: string): Promise<ArtistDetail> => req(`/api/artists/${key}`),
   rarities: (artistId: string): Promise<{ rarity: string; count: number }[]> => req(`/api/tracks/rarities?artist=${artistId}`),
   nonce: (address: string): Promise<{ nonce: string }> => req(`/api/auth/nonce?address=${address}`),
