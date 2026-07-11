@@ -9,7 +9,7 @@ import WaveformPlayer from "@/components/WaveformPlayer";
 import BuyModal from "@/components/BuyModal";
 import ClaimModal from "@/components/ClaimModal";
 import { CoverArt, avatarUrl } from "@/lib/art";
-import { api, type Track, type SaleHistory } from "@/lib/api";
+import { api, type Track, type SaleHistory, type ActivityEvent } from "@/lib/api";
 import { musicAbi, MUSIC_CONTRACT } from "@/lib/abi";
 import { marketAbi, MARKET_CONTRACT } from "@/lib/marketAbi";
 import { useAuth } from "@/lib/auth";
@@ -83,6 +83,7 @@ export default function TrackPage() {
   const [track, setTrack] = useState<Track | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "missing">("loading");
   const [history, setHistory] = useState<SaleHistory[]>([]);
+  const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [msg, setMsg] = useState("");
   const [liking, setLiking] = useState(false);
   const tRef = useRef<any>(null);
@@ -124,6 +125,7 @@ export default function TrackPage() {
   function load() {
     api.track(id).then((t) => { setTrack(t); setState("ready"); }).catch(() => setState("missing"));
     api.history(id).then(setHistory).catch(() => setHistory([]));
+    api.activity(id).then(setActivity).catch(() => setActivity([]));
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 
@@ -231,12 +233,14 @@ export default function TrackPage() {
     refetchOffers();
     refetchBalance();
     load();
+    api.activity(id).then(setActivity).catch(() => {});
   }
 
   async function onBuyListing(l: Listing) {
     if (!track) return;
     const res = await buyListing(l.id, l.qty, l.unit, track.id);
     if (!res.ok) return toast(res.error);
+    if (res.hash) api.recordActivity({ trackId: track.id, kind: "sale", txHash: res.hash }).catch(() => {});
     toast(res.warn ? `⚠ ${res.warn}` : "Purchased from marketplace ✓");
     refreshChain();
   }
@@ -245,6 +249,7 @@ export default function TrackPage() {
     if (!track) return;
     const res = await acceptOffer(o.id, track.id, o.qty);
     if (!res.ok) return toast(res.error);
+    if (res.hash) api.recordActivity({ trackId: track.id, kind: "sale", txHash: res.hash }).catch(() => {});
     toast(res.warn ? `⚠ ${res.warn}` : `Offer accepted — ${usd(o.unit * BigInt(o.qty), rate) ?? "payment"} received ✓`);
     refreshChain();
   }
@@ -308,6 +313,7 @@ export default function TrackPage() {
     if (chainTokenId == null) return toast("Track not yet on-chain");
     const res = await transfer(chainTokenId, xferTo.trim(), Number(xferQty) || 1);
     if (!res.ok) return toast(res.error);
+    if (res.hash && track) api.recordActivity({ trackId: track.id, kind: "transfer", txHash: res.hash }).catch(() => {});
     toast("Transferred ✓");
     setXferTo("");
     refreshChain();
@@ -425,7 +431,7 @@ export default function TrackPage() {
               <div className="os-tabs" role="tablist">
                 <button role="tab" aria-selected={tab === "details"} className={`os-tab${tab === "details" ? " active" : ""}`} onClick={() => setTab("details")}>DETAILS</button>
                 <button role="tab" aria-selected={tab === "orders"} className={`os-tab${tab === "orders" ? " active" : ""}`} onClick={() => setTab("orders")}>ORDERS{ordersCount > 0 ? ` (${ordersCount})` : ""}</button>
-                <button role="tab" aria-selected={tab === "activity"} className={`os-tab${tab === "activity" ? " active" : ""}`} onClick={() => setTab("activity")}>ACTIVITY{history.length > 0 ? ` (${history.length})` : ""}</button>
+                <button role="tab" aria-selected={tab === "activity"} className={`os-tab${tab === "activity" ? " active" : ""}`} onClick={() => setTab("activity")}>ACTIVITY{activity.length > 0 ? ` (${activity.length})` : ""}</button>
               </div>
 
               {/* ---- DETAILS tab: traits grid + on-chain list ---- */}
@@ -477,24 +483,32 @@ export default function TrackPage() {
                 </>
               )}
 
-              {/* ---- ACTIVITY tab: price history ---- */}
+              {/* ---- ACTIVITY tab: full item history (mint / purchase / transfer / sale) ---- */}
               {tab === "activity" && (
-                history.length === 0 ? (
-                  <div className="muted-note">No sales recorded yet.</div>
+                activity.length === 0 ? (
+                  <div className="muted-note">No activity yet.</div>
                 ) : (
                   <div className="tk-panel os-panel">
                     {sparkPoints.length >= 2 && (
                       <div className="tk-spark"><Sparkline points={sparkPoints} /><span>unit price trend</span></div>
                     )}
-                    <ul className="tk-history">
-                      {history.map((h, i) => (
-                        <li key={i}>
-                          <span className={`tk-kind tk-${h.kind.includes("primary") ? "pri" : "sec"}`}>{h.kind.replace("secondary_", "").replace("fiat_primary", "card")}</span>
-                          <span className="tk-qty">×{h.qty}</span>
-                          <span className="tk-price">{usd(h.unitWei, rate) ?? "…"}</span>
-                          <span className="tk-date">{new Date(h.at).toLocaleDateString()}</span>
-                        </li>
-                      ))}
+                    <ul className="act-list">
+                      {activity.map((a, i) => {
+                        const label = { mint: "Minted", purchase: "Purchased", transfer: "Transferred", sale: "Sold", list: "Listed" }[a.kind] || a.kind;
+                        return (
+                          <li key={i} className="act-row">
+                            <span className={`act-kind act-${a.kind}`}>{label}</span>
+                            <span className="act-parties">
+                              {a.from ? <a href={`${EXPLORER}/address/${a.from}`} target="_blank" rel="noreferrer">{shortAddr(a.from)}</a> : <em>{a.kind === "mint" ? "created" : "platform"}</em>}
+                              <span className="act-arrow">→</span>
+                              {a.to ? <a href={`${EXPLORER}/address/${a.to}`} target="_blank" rel="noreferrer">{shortAddr(a.to)}</a> : "—"}
+                            </span>
+                            <span className="act-price">{a.priceWei ? (usd(a.priceWei, rate) ?? "…") : (a.kind === "transfer" ? "transfer" : "—")}</span>
+                            <span className="act-date">{new Date(a.at).toLocaleString()}</span>
+                            {a.txHash && <a className="act-tx" href={`${EXPLORER}/tx/${a.txHash}`} target="_blank" rel="noreferrer" title="View transaction">↗</a>}
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 )
@@ -688,6 +702,23 @@ export default function TrackPage() {
         .os-attr-type { font-family: var(--mono, monospace); font-size: 9px; letter-spacing: 1px; color: var(--crimson-soft, #ffa052); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
         .os-attr-val { font-size: 13px; color: var(--ink, #fff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
         .os-attr-rare { font-family: var(--mono, monospace); font-size: 10px; color: var(--muted, #bec0c2); }
+        .act-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+        .act-row { display: grid; grid-template-columns: 92px minmax(0,1fr) auto auto 18px; align-items: center; gap: 12px; padding: 11px 4px; border-bottom: 1px solid var(--card-line); font-size: 12.5px; }
+        .act-row:last-child { border-bottom: none; }
+        .act-kind { font-family: var(--mono, monospace); font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; padding: 4px 8px; border-radius: 5px; text-align: center; }
+        .act-mint { background: rgba(31,58,138,.18); color: #7aa2ff; }
+        .act-purchase { background: rgba(6,214,160,.16); color: #06d6a0; }
+        .act-transfer { background: rgba(245,132,38,.16); color: var(--crimson-soft, #ffa052); }
+        .act-sale { background: rgba(232,121,249,.16); color: #e879f9; }
+        .act-parties { display: flex; align-items: center; gap: 7px; color: var(--muted); min-width: 0; font-family: var(--mono, monospace); font-size: 11.5px; }
+        .act-parties a { color: var(--ink); text-decoration: none; }
+        .act-parties a:hover { color: var(--crimson-soft, #ffa052); }
+        .act-parties em { color: var(--muted); font-style: normal; }
+        .act-arrow { color: var(--muted); }
+        .act-price { font-weight: 700; color: var(--ink); white-space: nowrap; }
+        .act-date { color: var(--muted); font-size: 11px; white-space: nowrap; }
+        .act-tx { color: var(--crimson-soft, #ffa052); text-decoration: none; }
+        @media (max-width: 560px) { .act-row { grid-template-columns: 80px 1fr auto; } .act-date { display: none; } }
         @media (max-width: 900px) {
           .os-grid { grid-template-columns: 1fr; gap: 22px; }
           .os-media { position: static; }

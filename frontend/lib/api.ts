@@ -58,6 +58,7 @@ export type AdminStats = {
 export type AdminTrack = Track & { _count?: { likes: number; sales: number }; flagged: boolean };
 export type AdminUser = { id: string; address: string; handle: string | null; bio: string | null; flagged: boolean; createdAt: string; _count?: { tracks: number; sales: number } };
 
+export type ActivityEvent = { kind: string; from: string | null; to: string | null; priceWei: string | null; qty: number; txHash: string | null; at: string };
 export type TrendingTrack = Track & { windowVolumeWei: string; windowSales: number; isNew?: boolean };
 export type TrendWindow = "1h" | "1d" | "7d" | "all";
 
@@ -86,6 +87,8 @@ export const api = {
   recordSale: (b: { trackId: string; qty: number; priceWei: string; txHash: string }) => req(`/api/sales`, { method: "POST", body: JSON.stringify(b) }),
   recordSecondarySale: (b: { trackId: string; qty: number; txHash: string }) => req(`/api/sales/secondary`, { method: "POST", body: JSON.stringify(b) }),
   history: (trackId: string): Promise<SaleHistory[]> => req(`/api/sales/history/${trackId}`),
+  activity: (trackId: string): Promise<ActivityEvent[]> => req(`/api/activity/${trackId}`),
+  recordActivity: (b: { trackId: string; kind: "purchase" | "transfer" | "sale"; txHash: string }) => req(`/api/activity`, { method: "POST", body: JSON.stringify(b) }),
   createTrack: (b: Record<string, unknown>) => req(`/api/tracks`, { method: "POST", body: JSON.stringify(b) }),
 
   // M3: IPFS pipeline + token-gated streaming

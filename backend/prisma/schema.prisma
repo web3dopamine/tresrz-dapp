@@ -45,6 +45,22 @@ model Collection {
   @@index([ownerId])
 }
 
+// Item activity log (OpenSea-style): one row per event on a track — mint,
+// purchase, transfer, sale, list — for the NFT page's Activity feed.
+model Activity {
+  id         String   @id @default(cuid())
+  track      Track    @relation(fields: [trackId], references: [id])
+  trackId    String
+  kind       String   // mint | purchase | transfer | sale | list
+  fromAddr   String?
+  toAddr     String?
+  priceWei   String?
+  qty        Int      @default(1)
+  txHash     String?
+  at         DateTime @default(now())
+  @@index([trackId])
+}
+
 // Custodial creator withdrawal of accrued earnings to a wallet address.
 model Payout {
   id        String   @id @default(cuid())
@@ -90,6 +106,7 @@ model Track {
   likes        Like[]
   sales        Sale[]
   fiatOrders   FiatOrder[]
+  activities   Activity[]
   media        TrackMedia?
 }
 

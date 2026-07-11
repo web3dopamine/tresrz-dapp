@@ -87,6 +87,7 @@ export default function BuyModal({
   async function payCrypto() {
     const res = await buy(track!);
     if (!res.ok) return toast(res.error);
+    if (res.hash) api.recordActivity({ trackId: track!.id, kind: "purchase", txHash: res.hash }).catch(() => {});
     toast(res.warn ? `⚠ ${res.warn}` : `Bought ${track!.title} ✓`);
     onClose();
     onBought?.();
