@@ -53,20 +53,34 @@ export default function TrackCard({ t, toast }: { t: Track; toast: (m: string) =
     }
   }
 
+  const isVideo = !!t.mime?.startsWith("video");
+
   return (
     <div className="card">
-      <div className={`art${playing ? " playing" : ""}`} onClick={() => router.push(`/track/${t.id}`)} style={{ cursor: "pointer" }}>
-        <CoverArt seed={t.coverSeed} url={t.coverUrl} video={t.mime?.startsWith("video") ? t.audioUrl : undefined} />
+      <div
+        className={`art${playing ? " playing" : ""}`}
+        onClick={() => router.push(`/track/${t.id}`)}
+        style={{ cursor: "pointer" }}
+        // video NFTs: play the animation on hover (driven from the container so the
+        // overlays below don't swallow the hover). muted preview; sound on the item page.
+        onMouseEnter={isVideo ? (e) => { const v = e.currentTarget.querySelector("video"); v?.play().catch(() => {}); } : undefined}
+        onMouseLeave={isVideo ? (e) => { const v = e.currentTarget.querySelector("video"); if (v) { v.pause(); v.currentTime = 0; } } : undefined}
+      >
+        <CoverArt seed={t.coverSeed} url={t.coverUrl} video={isVideo ? t.audioUrl : undefined} />
         <div className="genre">{t.genre}</div>
-        <div className="play" onClick={togglePlay}>
-          <div className="pbtn">
-            {playing
-              ? <svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z" /></svg>
-              : <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>}
-          </div>
-        </div>
-        <div className="wave">{Array.from({ length: 22 }).map((_, i) => <i key={i} style={{ animationDelay: `${i * 0.06}s` }} />)}</div>
-        {t.audioUrl && <audio ref={audioRef} src={t.audioUrl} preload="none" onEnded={() => setPlaying(false)} onPause={() => setPlaying(false)} onPlay={() => setPlaying(true)} />}
+        {!isVideo && (
+          <>
+            <div className="play" onClick={togglePlay}>
+              <div className="pbtn">
+                {playing
+                  ? <svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z" /></svg>
+                  : <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>}
+              </div>
+            </div>
+            <div className="wave">{Array.from({ length: 22 }).map((_, i) => <i key={i} style={{ animationDelay: `${i * 0.06}s` }} />)}</div>
+            {t.audioUrl && <audio ref={audioRef} src={t.audioUrl} preload="none" onEnded={() => setPlaying(false)} onPause={() => setPlaying(false)} onPlay={() => setPlaying(true)} />}
+          </>
+        )}
       </div>
       <h3><Link href={`/track/${t.id}`} style={{ color: "inherit", textDecoration: "none" }}>{t.title}</Link></h3>
       <Link href={`/artist/${t.artist.address}`} className="by" style={{ textDecoration: "none" }}>
