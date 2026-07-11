@@ -24,7 +24,7 @@ export function CoverArt({ seed, style, url, video, controls }: { seed: number; 
         src={video}
         poster={url || undefined}
         controls={controls}
-        preload={controls ? "metadata" : "none"}
+        preload="metadata"
         muted={hover}
         loop={hover}
         playsInline
