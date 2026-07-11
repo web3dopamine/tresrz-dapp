@@ -56,7 +56,7 @@ export default function TrackCard({ t, toast }: { t: Track; toast: (m: string) =
   return (
     <div className="card">
       <div className={`art${playing ? " playing" : ""}`} onClick={() => router.push(`/track/${t.id}`)} style={{ cursor: "pointer" }}>
-        <CoverArt seed={t.coverSeed} />
+        <CoverArt seed={t.coverSeed} url={t.coverUrl} />
         <div className="genre">{t.genre}</div>
         <div className="play" onClick={togglePlay}>
           <div className="pbtn">

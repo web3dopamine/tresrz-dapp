@@ -100,7 +100,7 @@ export default function BuyModal({
         <button className="bm-close" onClick={onClose} aria-label="Close">✕</button>
 
         <div className="bm-head">
-          <div className="bm-cover"><CoverArt seed={track.coverSeed} /></div>
+          <div className="bm-cover"><CoverArt seed={track.coverSeed} url={track.coverUrl} /></div>
           <div className="bm-meta">
             <b>{track.title}</b>
             <span>by {track.artist.handle} · {track.left} of {track.maxSupply} left</span>

@@ -97,7 +97,7 @@ export default function Home() {
             <div className="muted-note">No tracks match your search/filter.</div>
           ) : featured.map((t) => (
             <Link key={t.id} href={`/track/${t.id}`} className="feat-card">
-              <div className="feat-art"><CoverArt seed={t.coverSeed} /></div>
+              <div className="feat-art"><CoverArt seed={t.coverSeed} url={t.coverUrl} /></div>
               <span className="feat-pill">★ FEATURED</span>
               <div className="feat-info">
                 <h3>{t.title}</h3>
@@ -144,7 +144,7 @@ export default function Home() {
                   <div className="coll-covers">
                     {cells.slice(0, 4).map((cv, i) => (
                       <div key={i} className="coll-cell">
-                        {cv.coverUrl ? <img src={cv.coverUrl} alt="" loading="lazy" /> : <CoverArt seed={cv.coverSeed} />}
+                        <CoverArt seed={cv.coverSeed} url={cv.coverUrl} />
                       </div>
                     ))}
                   </div>
@@ -195,7 +195,7 @@ export default function Home() {
             <Link key={t.id} href={`/track/${t.id}`} className="trend-tr">
               <span className="tt-rank">{i + 1}</span>
               <span className="tt-track">
-                <span className="tt-cover"><CoverArt seed={t.coverSeed} /></span>
+                <span className="tt-cover"><CoverArt seed={t.coverSeed} url={t.coverUrl} /></span>
                 <span className="tt-name">
                   <b>{t.title}{(t as any).isNew && <span className="tt-new">NEW</span>}</b>
                   <small>{t.artist.handle} · {t.genre}</small>

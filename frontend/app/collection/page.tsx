@@ -119,7 +119,7 @@ export default function CollectionPage() {
                 return (
                   <div key={track.id} className="card">
                     <Link href={`/track/${track.id}`} className="art" style={{ marginBottom: 11, textDecoration: "none", display: "block" }}>
-                      <CoverArt seed={track.coverSeed} />
+                      <CoverArt seed={track.coverSeed} url={track.coverUrl} />
                       <div className="genre">{track.genre}</div>
                       {minting && <span className="owned-badge" style={{ background: "rgba(245,132,38,.9)" }}>PUBLISHING…</span>}
                       {failed && <span className="owned-badge" style={{ background: "rgba(200,40,40,.9)" }}>FAILED</span>}
@@ -164,7 +164,7 @@ export default function CollectionPage() {
                 <div key={tokenId} className="card">
                   {track ? (
                     <Link href={`/track/${track.id}`} className="art" style={{ marginBottom: 11, textDecoration: "none", display: "block" }}>
-                      <CoverArt seed={track.coverSeed} />
+                      <CoverArt seed={track.coverSeed} url={track.coverUrl} />
                       <div className="genre">{track.genre}</div>
                       <span className="owned-badge">×{qty}</span>
                     </Link>

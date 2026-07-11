@@ -9,7 +9,21 @@ const palettes = [
 ];
 const rand = (s: number) => { const x = Math.sin(s * 9999) * 10000; return x - Math.floor(x); };
 
-export function CoverArt({ seed, style }: { seed: number; style?: number }) {
+export function CoverArt({ seed, style, url }: { seed: number; style?: number; url?: string | null }) {
+  const [failed, setFailed] = React.useState(false);
+  // Real cover image (from NFT metadata) when present; generative art otherwise
+  // or if the image fails to load.
+  if (url && !failed) {
+    return (
+      <img
+        src={url}
+        alt=""
+        loading="lazy"
+        onError={() => setFailed(true)}
+        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+      />
+    );
+  }
   const st = (style ?? seed) % 3;
   const p = palettes[Math.floor(rand(seed + 1) * palettes.length)];
   const shapes: React.ReactNode[] = [];

@@ -354,7 +354,7 @@ export default function TrackPage() {
             {/* ---- left: sticky media (cover + player) ---- */}
             <div className="os-media">
               <div className="detail-cover">
-                <CoverArt seed={track.coverSeed} />
+                <CoverArt seed={track.coverSeed} url={track.coverUrl} />
                 <div className="genre">{track.genre}</div>
               </div>
               <WaveformPlayer track={track} />
