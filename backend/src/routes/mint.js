@@ -38,6 +38,7 @@ r.post("/custodial", requireAuth, upload.fields([{ name: "audio", maxCount: 1 },
     const priceUsd = Number(b.priceUsd);
     const royaltyPct = Number(b.royaltyPct);
     const coverSeed = Number(b.coverSeed) || Math.floor(Math.random() * 9999);
+    const collectionId = String(b.collectionId || "").trim() || null;
 
     // ---- validation ----
     if (!title || title.length > 120) return res.status(400).json({ error: "title required (<=120 chars)" });
@@ -74,6 +75,14 @@ r.post("/custodial", requireAuth, upload.fields([{ name: "audio", maxCount: 1 },
       if (free) await prisma.user.update({ where: { id: creator.id }, data: { handle } });
     }
 
+    // optional: assign to one of the creator's own collections
+    let validCollectionId = null;
+    if (collectionId) {
+      const col = await prisma.collection.findFirst({ where: { id: collectionId, ownerId: creator.id } });
+      if (!col) return res.status(400).json({ error: "collection not found or not yours" });
+      validCollectionId = col.id;
+    }
+
     // ---- persist a "publishing" placeholder and RETURN IMMEDIATELY. The slow work
     // — pinning audio/image/metadata to IPFS and submitting the on-chain mint — is
     // done in the background (see finalizePublish). The track is hidden from public
@@ -84,6 +93,7 @@ r.post("/custodial", requireAuth, upload.fields([{ name: "audio", maxCount: 1 },
         coverSeed, audioCid: null, metadataUri: null,
         mime: audio.mimetype, chainTokenId: null, txHash: null, mintTx: null,
         mintStatus: "publishing", custodial: true, artistId: creator.id,
+        collectionId: validCollectionId,
         // store the raw bytes so the track is served + playable from our DB instantly
         media: { create: {
           audioData: audio.buffer, audioMime: audio.mimetype,

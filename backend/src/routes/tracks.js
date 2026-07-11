@@ -76,7 +76,7 @@ const shape = (t, userId) => ({
 
 // GET /api/tracks?hot=true&genre=HOUSE&limit=10
 r.get("/", optionalAuth, async (req, res) => {
-  const { hot, genre, limit, q, rarity, artist, skip } = req.query;
+  const { hot, genre, limit, q, rarity, artist, skip, collection } = req.query;
   // hide moderated tracks + users and failed publishes; show live tracks plus ones
   // still finalizing in the background (publishing/minting) so a fresh publish
   // appears on the marketplace instantly (buying is gated until it's on-chain).
@@ -84,7 +84,8 @@ r.get("/", optionalAuth, async (req, res) => {
   if (hot === "true") where.hot = true;
   if (genre) where.genre = String(genre).toUpperCase();
   if (rarity) where.rarity = String(rarity).toUpperCase();          // COMMON | RARE | ULTRA RARE
-  if (artist) where.artistId = String(artist);                       // scope to one creator's collection
+  if (artist) where.artistId = String(artist);                       // scope to one creator
+  if (collection) where.collectionId = String(collection);          // scope to one collection
   if (q) {
     // server-side search across title + artist handle/address
     where.OR = [
@@ -171,6 +172,7 @@ r.get("/trending", optionalAuth, async (req, res) => {
 r.get("/rarities", async (req, res) => {
   const where = { flagged: false, artist: { flagged: false }, mintStatus: { in: ["active", "minting", "publishing"] }, rarity: { not: null } };
   if (req.query.artist) where.artistId = String(req.query.artist);
+  if (req.query.collection) where.collectionId = String(req.query.collection);
   const groups = await prisma.track.groupBy({ by: ["rarity"], where, _count: { rarity: true } });
   res.json(groups.map((g) => ({ rarity: g.rarity, count: g._count.rarity })).sort((a, b) => b.count - a.count));
 });

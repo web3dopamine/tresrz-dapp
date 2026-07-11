@@ -133,14 +133,14 @@ export default function Home() {
         <section className="me-block" id="collections">
           <div className="sec-head">
             <div className="sec-title">COLLECTIONS</div>
-            <Link className="sec-more" href="/#popular">all creators →</Link>
+            <Link className="sec-more" href="/collections/new">+ create collection</Link>
           </div>
           <div className="coll-grid">
             {collections.map((c) => {
               const cells = [...c.covers];
-              while (cells.length < 4) cells.push({ coverSeed: c.avatarSeed + cells.length * 7, coverUrl: null });
+              while (cells.length < 4) cells.push({ coverSeed: c.owner.avatarSeed + cells.length * 7, coverUrl: null });
               return (
-                <Link key={c.id} href={`/artist/${c.address}`} className="coll-card">
+                <Link key={c.id} href={`/collections/${c.slug}`} className="coll-card">
                   <div className="coll-covers">
                     {cells.slice(0, 4).map((cv, i) => (
                       <div key={i} className="coll-cell">
@@ -149,7 +149,7 @@ export default function Home() {
                     ))}
                   </div>
                   <div className="coll-info">
-                    <img className="coll-av" src={avatarUrl(c.avatarSeed)} alt="" />
+                    <img className="coll-av" src={avatarUrl(c.owner.avatarSeed)} alt="" />
                     <div className="coll-meta">
                       <b>{c.name}</b>
                       <div className="coll-stats">

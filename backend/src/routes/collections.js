@@ -1,46 +1,73 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
+import { requireAuth } from "../middleware/auth.js";
 
-// Collections = creators, presented OpenSea-style. Name comes from the dominant
-// "Project" trait when present (imported collections), else the creator handle.
+// Named collections (OpenSea-style). One creator can own many. Tracks link to a
+// collection via Track.collectionId; the collection name/description/owner live here.
 const r = Router();
 
 const handleOf = (u) => u.handle || (u.email ? u.email.split("@")[0] : (u.address ? u.address.slice(0, 6) + "…" : "Creator"));
+const slugify = (s) => String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "collection";
 
+async function stats(collectionId) {
+  const where = { collectionId, flagged: false, mintStatus: { in: ["active", "minting", "publishing"] } };
+  const itemCount = await prisma.track.count({ where: { collectionId, flagged: false } });
+  const covers = await prisma.track.findMany({ where, select: { coverSeed: true, coverUrl: true }, take: 4, orderBy: { createdAt: "desc" } });
+  let floorWei = null;
+  try {
+    const f = await prisma.$queryRawUnsafe(
+      `SELECT MIN(CAST("priceWei" AS NUMERIC))::text AS floor FROM "Track" WHERE "collectionId"=$1 AND flagged=false AND "mintStatus" IN ('active','minting','publishing')`, collectionId);
+    floorWei = f[0]?.floor || null;
+  } catch {}
+  return { itemCount, floorWei, covers };
+}
+
+// POST /api/collections  -> create a collection {name, description?}
+r.post("/", requireAuth, async (req, res) => {
+  const name = String(req.body?.name || "").trim();
+  const description = String(req.body?.description || "").trim() || null;
+  if (!name || name.length > 80) return res.status(400).json({ error: "name required (<=80 chars)" });
+  let base = slugify(name), slug = base, n = 1;
+  while (await prisma.collection.findUnique({ where: { slug } })) slug = `${base}-${++n}`;
+  const c = await prisma.collection.create({ data: { name: name.slice(0, 80), description, slug, ownerId: req.user.id } });
+  res.status(201).json({ id: c.id, name: c.name, slug: c.slug, description: c.description });
+});
+
+// GET /api/collections  -> all collections with stats (for the homepage grid)
 r.get("/", async (req, res) => {
-  const limit = Math.min(Number(req.query.limit) || 12, 30);
-  const users = await prisma.user.findMany({
-    where: { flagged: false, tracks: { some: { flagged: false } } },
-    include: { _count: { select: { tracks: true } } },
-    orderBy: { tracks: { _count: "desc" } },
-    take: limit,
+  const limit = Math.min(Number(req.query.limit) || 12, 50);
+  const cols = await prisma.collection.findMany({
+    where: { flagged: false }, include: { owner: true, _count: { select: { tracks: true } } },
+    orderBy: { tracks: { _count: "desc" } }, take: limit,
   });
-  const out = [];
-  for (const u of users) {
-    let name = handleOf(u);
-    try {
-      const proj = await prisma.$queryRawUnsafe(
-        `SELECT elem->>'value' AS val FROM "Track", jsonb_array_elements(attributes) elem
-         WHERE "artistId"=$1 AND attributes IS NOT NULL AND elem->>'trait_type'='Project' GROUP BY 1 ORDER BY COUNT(*) DESC LIMIT 1`, u.id);
-      if (proj[0]?.val) name = proj[0].val;
-    } catch {}
-    let floorWei = null;
-    try {
-      const f = await prisma.$queryRawUnsafe(
-        `SELECT MIN(CAST("priceWei" AS NUMERIC))::text AS floor FROM "Track"
-         WHERE "artistId"=$1 AND flagged=false AND "mintStatus" IN ('active','minting','publishing')`, u.id);
-      floorWei = f[0]?.floor || null;
-    } catch {}
-    const covers = await prisma.track.findMany({
-      where: { artistId: u.id, flagged: false, mintStatus: { in: ["active", "minting", "publishing"] } },
-      select: { coverSeed: true, coverUrl: true }, take: 4, orderBy: { createdAt: "desc" },
-    });
-    out.push({
-      id: u.id, name, handle: handleOf(u), address: u.address || u.id, avatarSeed: u.avatarSeed,
-      itemCount: u._count.tracks, floorWei, covers,
-    });
-  }
+  const out = await Promise.all(cols.map(async (c) => ({
+    id: c.id, name: c.name, slug: c.slug, description: c.description, coverUrl: c.coverUrl,
+    owner: { id: c.owner.id, handle: handleOf(c.owner), avatarSeed: c.owner.avatarSeed, address: c.owner.address || c.owner.id },
+    ...(await stats(c.id)),
+  })));
   res.json(out);
+});
+
+// GET /api/collections/mine  -> the caller's own collections (for the publish picker)
+r.get("/mine", requireAuth, async (req, res) => {
+  const cols = await prisma.collection.findMany({
+    where: { ownerId: req.user.id }, include: { _count: { select: { tracks: true } } }, orderBy: { createdAt: "desc" },
+  });
+  res.json(cols.map((c) => ({ id: c.id, name: c.name, slug: c.slug, itemCount: c._count.tracks })));
+});
+
+// GET /api/collections/:key  -> one collection (by id or slug) with stats + rarities
+r.get("/:key", async (req, res) => {
+  const c = await prisma.collection.findFirst({ where: { OR: [{ id: req.params.key }, { slug: req.params.key }], flagged: false }, include: { owner: true } });
+  if (!c) return res.status(404).json({ error: "collection not found" });
+  const s = await stats(c.id);
+  const groups = await prisma.track.groupBy({ by: ["rarity"], where: { collectionId: c.id, flagged: false, rarity: { not: null } }, _count: { rarity: true } });
+  res.json({
+    id: c.id, name: c.name, slug: c.slug, description: c.description, coverUrl: c.coverUrl,
+    owner: { id: c.owner.id, handle: handleOf(c.owner), avatarSeed: c.owner.avatarSeed, address: c.owner.address || c.owner.id },
+    itemCount: s.itemCount, floorWei: s.floorWei, covers: s.covers,
+    rarities: groups.map((g) => ({ rarity: g.rarity, count: g._count.rarity })).sort((a, b) => b.count - a.count),
+  });
 });
 
 export default r;

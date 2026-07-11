@@ -1,9 +1,9 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Header from "@/components/Header";
 import { CoverArt } from "@/lib/art";
-import { api } from "@/lib/api";
+import { api, type MyCollection } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import PublishCelebration from "@/components/PublishCelebration";
 
@@ -21,6 +21,10 @@ export default function MintPage() {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [coverSeed, setCoverSeed] = useState(() => 100 + Math.floor(Math.abs(Math.sin(1) * 9999)));
+
+  const [collections, setCollections] = useState<MyCollection[]>([]);
+  const [collectionId, setCollectionId] = useState("");
+  useEffect(() => { if (token) api.myCollections().then(setCollections).catch(() => {}); }, [token]);
 
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
@@ -49,6 +53,7 @@ export default function MintPage() {
       fd.append("royaltyPct", String(Number(royalty)));
       fd.append("coverSeed", String(coverSeed));
       if (artist.trim()) fd.append("handle", artist.trim());
+      if (collectionId) fd.append("collectionId", collectionId);
       fd.append("audio", audioFile!);
       if (imageFile) fd.append("image", imageFile);
       const res = await api.custodialMint(fd, setProgress);
@@ -87,6 +92,14 @@ export default function MintPage() {
           <form className="mint-form" onSubmit={onSubmit}>
             <label className="mint-field"><span>TITLE</span><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="NEON PULSE" maxLength={60} /></label>
             <label className="mint-field"><span>ARTIST NAME</span><input value={artist} onChange={(e) => setArtist(e.target.value)} placeholder="BLOCKJ4NE" maxLength={40} /></label>
+            <label className="mint-field">
+              <span>COLLECTION (OPTIONAL)</span>
+              <select value={collectionId} onChange={(e) => setCollectionId(e.target.value)}>
+                <option value="">— No collection —</option>
+                {collections.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.itemCount})</option>)}
+              </select>
+              <small className="mint-hint"><Link href="/collections/new">+ create a new collection</Link></small>
+            </label>
             <label className="mint-field"><span>GENRE</span><input value={genre} onChange={(e) => setGenre(e.target.value)} placeholder="SYNTHWAVE" maxLength={24} /></label>
             <label className="mint-field"><span>DESCRIPTION (OPTIONAL)</span><input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="A late-night synth journey…" maxLength={200} /></label>
             <div className="mint-row">

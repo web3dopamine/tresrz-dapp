@@ -26,6 +26,23 @@ model User {
   sales     Sale[]   @relation("BuyerSales")
   soldSales Sale[]   @relation("SellerSales")
   payouts   Payout[]
+  collections Collection[] @relation("OwnedCollections")
+}
+
+// A named collection a creator groups their tracks under (OpenSea-style). One
+// creator can own many collections.
+model Collection {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  coverUrl    String?
+  owner       User     @relation("OwnedCollections", fields: [ownerId], references: [id])
+  ownerId     String
+  flagged     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  tracks      Track[]
+  @@index([ownerId])
 }
 
 // Custodial creator withdrawal of accrued earnings to a wallet address.
@@ -54,7 +71,10 @@ model Track {
   externalUrl  String?                   // source/animation gateway URL for imported collections
   attributes   Json?                     // full trait list from imported metadata (OpenSea attributes[])
   rarity       String?                   // rarity tier (COMMON/RARE/ULTRA RARE...) for filtering
+  collection   Collection? @relation(fields: [collectionId], references: [id])
+  collectionId String?
   @@index([rarity])
+  @@index([collectionId])
   priceWei     String   @default("0")    // primary price per edition (wei, string for bigint)
   maxSupply    Int
   minted       Int      @default(0)
