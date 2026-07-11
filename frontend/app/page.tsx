@@ -97,7 +97,7 @@ export default function Home() {
             <div className="muted-note">No tracks match your search/filter.</div>
           ) : featured.map((t) => (
             <Link key={t.id} href={`/track/${t.id}`} className="feat-card">
-              <div className="feat-art"><CoverArt seed={t.coverSeed} url={t.coverUrl} video={t.mime?.startsWith("video") ? t.audioUrl : undefined} /></div>
+              <div className="feat-art"><CoverArt seed={t.coverSeed} url={t.coverUrl} video={t.mime?.startsWith("video") ? `/api/media/${t.id}/preview` : undefined} /></div>
               <span className="feat-pill">★ FEATURED</span>
               <div className="feat-info">
                 <h3>{t.title}</h3>

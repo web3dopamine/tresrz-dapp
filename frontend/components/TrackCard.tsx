@@ -66,7 +66,7 @@ export default function TrackCard({ t, toast }: { t: Track; toast: (m: string) =
         onMouseEnter={isVideo ? (e) => { const v = e.currentTarget.querySelector("video"); v?.play().catch(() => {}); } : undefined}
         onMouseLeave={isVideo ? (e) => { const v = e.currentTarget.querySelector("video"); if (v) { v.pause(); v.currentTime = 0; } } : undefined}
       >
-        <CoverArt seed={t.coverSeed} url={t.coverUrl} video={isVideo ? t.audioUrl : undefined} />
+        <CoverArt seed={t.coverSeed} url={t.coverUrl} video={isVideo ? `/api/media/${t.id}/preview` : undefined} />
         <div className="genre">{t.genre}</div>
         {!isVideo && (
           <>
