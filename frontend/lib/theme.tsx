@@ -4,11 +4,11 @@ import { createContext, useContext, useEffect, useState } from "react";
 type Theme = "dark" | "light";
 
 const ThemeCtx = createContext<{ theme: Theme; toggle: () => void }>({
-  theme: "light",
+  theme: "dark",
   toggle: () => {},
 });
 
-export const THEME_KEY = "tresrz-theme";
+export const THEME_KEY = "tresrz-theme2";
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // Initialise from the <html data-theme> attribute that the inline boot script
@@ -18,7 +18,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       const t = document.documentElement.dataset.theme;
       if (t === "light" || t === "dark") return t;
     }
-    return "light";
+    return "dark";
   });
 
   useEffect(() => {
