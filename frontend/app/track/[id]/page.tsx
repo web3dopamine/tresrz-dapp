@@ -354,10 +354,16 @@ export default function TrackPage() {
             {/* ---- left: sticky media (cover + player) ---- */}
             <div className="os-media">
               <div className="detail-cover">
-                <CoverArt seed={track.coverSeed} url={track.coverUrl} />
+                <CoverArt
+                  seed={track.coverSeed}
+                  url={track.coverUrl}
+                  video={track.mime?.startsWith("video") ? (track.externalUrl || track.audioUrl) : undefined}
+                  controls={track.mime?.startsWith("video") || undefined}
+                />
                 <div className="genre">{track.genre}</div>
               </div>
-              <WaveformPlayer track={track} />
+              {/* video NFTs carry their own audio; only audio tracks get the waveform player */}
+              {!track.mime?.startsWith("video") && <WaveformPlayer track={track} />}
             </div>
 
             {/* ---- right: info column ---- */}

@@ -9,17 +9,41 @@ const palettes = [
 ];
 const rand = (s: number) => { const x = Math.sin(s * 9999) * 10000; return x - Math.floor(x); };
 
-export function CoverArt({ seed, style, url }: { seed: number; style?: number; url?: string | null }) {
-  const [failed, setFailed] = React.useState(false);
+export function CoverArt({ seed, style, url, video, controls }: { seed: number; style?: number; url?: string | null; video?: string | null; controls?: boolean }) {
+  const [videoFailed, setVideoFailed] = React.useState(false);
+  const [imgFailed, setImgFailed] = React.useState(false);
+  const vref = React.useRef<HTMLVideoElement>(null);
+  // Video NFT (animation_url): full player with controls on the detail page,
+  // hover-to-play elsewhere. Poster = the cover image, so grids stay fast
+  // (preload="none" — the video only loads when interacted with).
+  if (video && !videoFailed) {
+    const hover = !controls;
+    return (
+      <video
+        ref={vref}
+        src={video}
+        poster={url || undefined}
+        controls={controls}
+        preload={controls ? "metadata" : "none"}
+        muted={hover}
+        loop={hover}
+        playsInline
+        onError={() => setVideoFailed(true)}
+        onMouseEnter={hover ? () => { vref.current?.play().catch(() => {}); } : undefined}
+        onMouseLeave={hover ? () => { const v = vref.current; if (v) { v.pause(); v.currentTime = 0; } } : undefined}
+        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+      />
+    );
+  }
   // Real cover image (from NFT metadata) when present; generative art otherwise
-  // or if the image fails to load.
-  if (url && !failed) {
+  // or if the image/video fails to load.
+  if (url && !imgFailed) {
     return (
       <img
         src={url}
         alt=""
         loading="lazy"
-        onError={() => setFailed(true)}
+        onError={() => setImgFailed(true)}
         style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
       />
     );
