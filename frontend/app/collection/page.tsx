@@ -6,7 +6,7 @@ import { useAccount, useReadContract, useReadContracts } from "wagmi";
 import Header from "@/components/Header";
 import { CoverArt, avatarUrl } from "@/lib/art";
 import { musicAbi, MUSIC_CONTRACT } from "@/lib/abi";
-import { api, type Track } from "@/lib/api";
+import { api, type Track, type MyCollection } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useTransfer } from "@/lib/useMarket";
 
@@ -17,6 +17,7 @@ export default function CollectionPage() {
   const [loadedTracks, setLoadedTracks] = useState(false);
   const [created, setCreated] = useState<Track[]>([]);
   const [loadedCreated, setLoadedCreated] = useState(false);
+  const [myCollections, setMyCollections] = useState<MyCollection[] | null>(null);
   const [msg, setMsg] = useState("");
   const tRef = useRef<any>(null);
   function toast(m: string) { setMsg(m); clearTimeout(tRef.current); tRef.current = setTimeout(() => setMsg(""), 2400); }
@@ -35,6 +36,7 @@ export default function CollectionPage() {
     api.myTracks()
       .then((d) => { if (live) { setCreated(d); setLoadedCreated(true); } })
       .catch(() => { if (live) setLoadedCreated(true); });
+    api.myCollections().then((d) => { if (live) setMyCollections(d); }).catch(() => { if (live) setMyCollections([]); });
     return () => { live = false; };
   }, [token]);
 
@@ -101,6 +103,37 @@ export default function CollectionPage() {
   return (
     <div className="wrap">
       <Header />
+
+      {/* Your named collections + the bulk-upload entry point */}
+      {token && (
+        <section className="block" id="your-collections">
+          <div className="sec-title">YOUR COLLECTIONS</div>
+          <div className="sec-bar" />
+          <div className="mycol-head">
+            <p className="muted-note" style={{ margin: 0 }}>Create a collection, then bulk-upload many items into it at once.</p>
+            <Link href="/collections/new" className="buy mycol-new">＋ NEW COLLECTION</Link>
+          </div>
+          {myCollections === null ? (
+            <div className="muted-note">Loading your collections…</div>
+          ) : myCollections.length === 0 ? (
+            <div className="muted-note">No collections yet. <Link href="/collections/new" style={{ color: "var(--crimson-soft)" }}>Create one →</Link> then you can bulk-upload into it.</div>
+          ) : (
+            <div className="mycol-list">
+              {myCollections.map((c) => (
+                <div key={c.id} className="mycol-row">
+                  <Link href={`/collections/${c.slug}`} className="mycol-name">
+                    <b>{c.name}</b><span>{c.itemCount.toLocaleString()} item{c.itemCount === 1 ? "" : "s"}</span>
+                  </Link>
+                  <div className="mycol-actions">
+                    <Link href={`/collections/${c.slug}`} className="buy col-mini col-ghost">OPEN</Link>
+                    <Link href={`/collections/${c.slug}/import`} className="buy col-mini">⬆ BULK UPLOAD</Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Tracks the user created (email/Google/wallet) */}
       {token && (
@@ -214,6 +247,14 @@ export default function CollectionPage() {
       <div className={`toast${msg ? " show" : ""}`}>{msg}</div>
 
       <style jsx>{`
+        .mycol-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+        .mycol-new { width: auto; padding: 10px 18px; text-decoration: none; font-size: 12px; white-space: nowrap; }
+        .mycol-list { display: flex; flex-direction: column; gap: 10px; }
+        .mycol-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; padding: 14px 16px; border: 1.5px solid var(--card-line, rgba(255,255,255,.14)); border-radius: 12px; }
+        .mycol-name { display: flex; flex-direction: column; gap: 3px; text-decoration: none; color: var(--ink); }
+        .mycol-name b { font-size: 15px; }
+        .mycol-name span { font-family: var(--mono, monospace); font-size: 11px; color: var(--muted); }
+        .mycol-actions { display: flex; gap: 8px; }
         .col-actions { display: flex; gap: 8px; margin-top: 10px; }
         .col-mini { width: auto; flex: 1; padding: 8px 10px; font-size: 11px; text-align: center; text-decoration: none; }
         .col-ghost { background: transparent; border: 1.5px solid rgba(245,132,38,.45); color: var(--ink, #fff); }

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
+import { submitSetPrice, submitBatchSetPrice, onChainPrice } from "../chain.js";
 
 const r = Router();
 
@@ -195,6 +196,104 @@ r.get("/:id", optionalAuth, async (req, res) => {
   // detail view carries the full trait list with collection rarity (OpenSea-style)
   const attributes = await withTraitRarity(t.attributes, t.artistId).catch(() => t.attributes || null);
   res.json({ ...shape(t, req.user?.id), attributes, externalUrl: t.externalUrl });
+});
+
+// PATCH /api/tracks/:id  -> creator self-edits their own track's details.
+// Only the artist (owner) may edit. Editable: title, genre, price, cover image,
+// rarity, external link. Chain-anchored fields (tokenId, supply, minted, txHash)
+// are intentionally NOT editable here.
+r.patch("/:id", requireAuth, async (req, res) => {
+  const t = await prisma.track.findUnique({ where: { id: req.params.id }, select: { artistId: true, chainTokenId: true, priceWei: true } });
+  if (!t) return res.status(404).json({ error: "not found" });
+  if (t.artistId !== req.user.id) return res.status(403).json({ error: "you can only edit your own tracks" });
+
+  const b = req.body || {};
+  const data = {};
+  if (b.title !== undefined) {
+    const title = String(b.title).trim();
+    if (!title) return res.status(400).json({ error: "title cannot be empty" });
+    data.title = title.slice(0, 120);
+  }
+  if (b.genre !== undefined) data.genre = String(b.genre).toUpperCase().trim().slice(0, 40) || "MUSIC";
+  if (b.rarity !== undefined) data.rarity = b.rarity ? String(b.rarity).toUpperCase().trim().slice(0, 40) : null;
+  if (b.coverUrl !== undefined) data.coverUrl = String(b.coverUrl).trim() || null;
+  if (b.externalUrl !== undefined) data.externalUrl = String(b.externalUrl).trim() || null;
+  // price: accept ETH (human-friendly) and store as wei string. priceWei also accepted.
+  if (b.priceEth !== undefined) {
+    const eth = Number(b.priceEth);
+    if (!Number.isFinite(eth) || eth < 0) return res.status(400).json({ error: "price must be a non-negative number" });
+    data.priceWei = BigInt(Math.round(eth * 1e18)).toString();
+  } else if (b.priceWei !== undefined) {
+    if (!/^\d+$/.test(String(b.priceWei))) return res.status(400).json({ error: "priceWei must be an integer string" });
+    data.priceWei = String(b.priceWei);
+  }
+  if (Object.keys(data).length === 0) return res.status(400).json({ error: "no editable fields provided" });
+
+  // A price change must land ON-CHAIN first: the contract decides what a buyer
+  // actually pays, so writing only the DB would show one price and charge another.
+  if (data.priceWei && data.priceWei !== t.priceWei && t.chainTokenId != null) {
+    const r = await submitSetPrice(t.chainTokenId, data.priceWei);
+    if (!r.ok) return res.status(502).json({ error: `could not update the on-chain price: ${r.reason}` });
+    data.txHash = r.hash;
+  }
+
+  const updated = await prisma.track.update({
+    where: { id: req.params.id }, data,
+    include: { artist: true, _count: { select: { likes: true } } },
+  });
+  res.json({ ...shape(updated, req.user.id), externalUrl: updated.externalUrl });
+});
+
+// POST /api/tracks/reprice  -> bulk re-price the caller's tracks, on-chain + DB.
+// Body: { collectionId?, byRarity?: { COMMON: 0.01, ... }, priceEth?: 0.05 }
+//   byRarity -> per-tier prices; priceEth -> one flat price for every match.
+// Scoped to tracks the caller owns. Pushes batchSetPrice on-chain in chunks so
+// the contract and the UI can never disagree about what a buyer pays.
+r.post("/reprice", requireAuth, async (req, res) => {
+  const { collectionId, byRarity, priceEth } = req.body || {};
+  const where = { artistId: req.user.id };
+  if (collectionId) where.collectionId = String(collectionId);
+
+  const rows = await prisma.track.findMany({ where, select: { id: true, rarity: true, chainTokenId: true } });
+  if (!rows.length) return res.status(404).json({ error: "no tracks matched" });
+
+  const toWei = (eth) => {
+    const n = Number(eth);
+    if (!Number.isFinite(n) || n < 0) return null;
+    return (BigInt(Math.round(n * 1e6)) * 10n ** 12n).toString();
+  };
+
+  // resolve a target price per track
+  const targets = [];
+  for (const t of rows) {
+    let eth = null;
+    if (byRarity && typeof byRarity === "object") eth = byRarity[String(t.rarity || "").toUpperCase()];
+    if (eth === undefined || eth === null) eth = priceEth;
+    if (eth === undefined || eth === null || eth === "") continue;   // untouched tier
+    const wei = toWei(eth);
+    if (wei === null) return res.status(400).json({ error: `invalid price for ${t.rarity || "track"}` });
+    targets.push({ ...t, wei });
+  }
+  if (!targets.length) return res.status(400).json({ error: "no prices supplied" });
+
+  // on-chain first, in chunks (only tracks that are actually minted)
+  const onChain = targets.filter((t) => t.chainTokenId != null);
+  const txs = [];
+  const CHUNK = 150;
+  for (let i = 0; i < onChain.length; i += CHUNK) {
+    const part = onChain.slice(i, i + CHUNK);
+    const r = await submitBatchSetPrice(part.map((x) => x.chainTokenId), part.map((x) => x.wei));
+    if (!r.ok) return res.status(502).json({ error: `on-chain re-price failed: ${r.reason}`, appliedTxs: txs });
+    txs.push(r.hash);
+  }
+
+  // then mirror into the DB
+  let updated = 0;
+  for (const t of targets) {
+    await prisma.track.update({ where: { id: t.id }, data: { priceWei: t.wei } });
+    updated++;
+  }
+  res.json({ updated, onChain: onChain.length, txs });
 });
 
 // POST /api/tracks  (after on-chain mint, persist metadata)

@@ -56,6 +56,29 @@ r.get("/mine", requireAuth, async (req, res) => {
   res.json(cols.map((c) => ({ id: c.id, name: c.name, slug: c.slug, itemCount: c._count.tracks })));
 });
 
+// PATCH /api/collections/:id  -> owner self-edits their collection.
+// Editable: name, description, cover image. Slug stays stable so existing links
+// keep working even after a rename.
+r.patch("/:id", requireAuth, async (req, res) => {
+  const c = await prisma.collection.findUnique({ where: { id: req.params.id }, select: { ownerId: true } });
+  if (!c) return res.status(404).json({ error: "collection not found" });
+  if (c.ownerId !== req.user.id) return res.status(403).json({ error: "you can only edit your own collections" });
+
+  const b = req.body || {};
+  const data = {};
+  if (b.name !== undefined) {
+    const name = String(b.name).trim();
+    if (!name || name.length > 80) return res.status(400).json({ error: "name required (<=80 chars)" });
+    data.name = name;
+  }
+  if (b.description !== undefined) data.description = String(b.description).trim() || null;
+  if (b.coverUrl !== undefined) data.coverUrl = String(b.coverUrl).trim() || null;
+  if (Object.keys(data).length === 0) return res.status(400).json({ error: "no editable fields provided" });
+
+  const updated = await prisma.collection.update({ where: { id: req.params.id }, data });
+  res.json({ id: updated.id, name: updated.name, slug: updated.slug, description: updated.description, coverUrl: updated.coverUrl });
+});
+
 // GET /api/collections/:key  -> one collection (by id or slug) with stats + rarities
 r.get("/:key", async (req, res) => {
   const c = await prisma.collection.findFirst({ where: { OR: [{ id: req.params.key }, { slug: req.params.key }], flagged: false }, include: { owner: true } });

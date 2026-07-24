@@ -11,33 +11,23 @@ import { CoverArt, avatarUrl } from "@/lib/art";
 import { api, type Track, type Artist, type Collection, type TrendingTrack, type TrendWindow } from "@/lib/api";
 import { useUsdRate, usd } from "@/lib/usd";
 
-// Fallback demo data so the UI renders even before the backend/seed is up
-const DEMO_TRACKS: Track[] = [
-  { id: "d1", chainTokenId: null, title: "NEON PULSE", genre: "SYNTHWAVE", coverSeed: 11, priceWei: "470000000000000000", maxSupply: 14, minted: 0, left: 14, hot: true, artist: { id: "a1", handle: "BLOCKJ4NE", address: "0x01", avatarSeed: 7 }, likes: 13, liked: false },
-  { id: "d2", chainTokenId: null, title: "Remore", genre: "HOUSE", coverSeed: 64, priceWei: "1970000000000000000", maxSupply: 1, minted: 0, left: 1, hot: true, artist: { id: "a2", handle: "Charlie", address: "0x02", avatarSeed: 144 }, likes: 9, liked: false },
-  { id: "d3", chainTokenId: null, title: "AWAKENING", genre: "AMBIENT", coverSeed: 117, priceWei: "3800000000000000000", maxSupply: 33, minted: 0, left: 33, hot: true, artist: { id: "a3", handle: "The_Account", address: "0x03", avatarSeed: 281 }, likes: 21, liked: false },
-  { id: "d4", chainTokenId: null, title: "Two Spirals", genre: "TECHNO", coverSeed: 170, priceWei: "850000000000000000", maxSupply: 5, minted: 0, left: 5, hot: true, artist: { id: "a4", handle: "TwoSpiral", address: "0x04", avatarSeed: 418 }, likes: 6, liked: false },
-  { id: "d5", chainTokenId: null, title: "Dub Skull", genre: "DUB", coverSeed: 223, priceWei: "9390000000000000000", maxSupply: 1, minted: 0, left: 1, hot: true, artist: { id: "a5", handle: "GordieDean", address: "0x05", avatarSeed: 555 }, likes: 7, liked: false },
-];
-const DEMO_LATEST: Track[] = ["After Hours/LO-FI", "Polychrome/JAZZ", "Latin Tech/TRAP", "Static Bloom/PHONK", "Midnight Run/DRILL"].map((s, i) => {
-  const [title, genre] = s.split("/");
-  return { id: `l${i}`, chainTokenId: null, title, genre, coverSeed: i * 53 + 300, priceWei: "300000000000000000", maxSupply: 10, minted: 0, left: 10, hot: false, artist: { id: `la${i}`, handle: ["MUSEO DIGITALE", "MUSEO DIGITALE", "MUSEO DIGITALE", "ANRIMMD_CLIPS", "NERVOUSCAT"][i], address: "0x0", avatarSeed: i * 90 + 5 }, likes: 0, liked: false };
-});
-const DEMO_ARTISTS: Artist[] = [
-  ["BELLADONNA", 2, 13], ["The Same Persons", 2, 9], ["NERVOUSCAT", 14, 21], ["Renato Cantini", 2, 6], ["IDDQD", 2, 7],
-  ["matlemad", 9, 14], ["Flower of Sound", 1, 5], ["Lego Flowers", 5, 10], ["Jaidem", 1, 8], ["Cappadonia", 1, 5],
-].map(([h, n, l], i) => ({ id: `ar${i}`, handle: h as string, address: "0x0", avatarSeed: i * 137 + 3, nftCount: n as number, likes: l as number }));
+// Gray shimmer placeholder — shown while a section's data is still loading, so
+// the page renders its real structure immediately (no demo/fake content).
+const Skeleton = ({ className = "", style }: { className?: string; style?: React.CSSProperties }) => (
+  <div className={`skl ${className}`} style={style} />
+);
 
 export default function Home() {
-  const [hot, setHot] = useState<Track[]>(DEMO_TRACKS);
-  const [latest, setLatest] = useState<Track[]>(DEMO_LATEST);
-  const [artists, setArtists] = useState<Artist[]>(DEMO_ARTISTS);
+  // null = still loading (show skeletons); array = loaded real data (maybe empty)
+  const [hot, setHot] = useState<Track[] | null>(null);
+  const [latest, setLatest] = useState<Track[] | null>(null);
+  const [artists, setArtists] = useState<Artist[] | null>(null);
   const [search, setSearch] = useState("");
   const [genre, setGenre] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
   const [trendWindow, setTrendWindow] = useState<TrendWindow>("1d");
   const [trendRows, setTrendRows] = useState<TrendingTrack[] | null>(null);
-  const [collections, setCollections] = useState<Collection[]>([]);
+  const [collections, setCollections] = useState<Collection[] | null>(null);
   const tRef = useRef<any>(null);
   const rate = useUsdRate();
   const [buyTrack, setBuyTrack] = useState<Track | null>(null);
@@ -45,10 +35,12 @@ export default function Home() {
   function toast(m: string) { setMsg(m); clearTimeout(tRef.current); tRef.current = setTimeout(() => setMsg(""), 2200); }
 
   useEffect(() => {
-    api.tracks("?hot=true").then((d) => d.length && setHot(d)).catch(() => {});
-    api.tracks("?limit=12").then((d) => d.length && setLatest(d)).catch(() => {});
-    api.artists().then((d) => d.length && setArtists(d)).catch(() => {});
-    api.collections(12).then((d) => setCollections(d)).catch(() => {});
+    // Set whatever the API returns (even an empty list) — never fall back to fake
+    // data. Empty just means "no items yet", which the sections handle gracefully.
+    api.tracks("?hot=true").then(setHot).catch(() => setHot([]));
+    api.tracks("?limit=12").then(setLatest).catch(() => setLatest([]));
+    api.artists().then(setArtists).catch(() => setArtists([]));
+    api.collections(12).then(setCollections).catch(() => setCollections([]));
   }, []);
 
   useEffect(() => {
@@ -59,29 +51,42 @@ export default function Home() {
   const q = search.toLowerCase();
   const matches = (t: Track) =>
     (t.title + t.artist.handle).toLowerCase().includes(q) && (!genre || t.genre === genre);
-  const fHot = useMemo(() => hot.filter(matches), [hot, q, genre]);
-  const fLatest = useMemo(() => latest.filter(matches), [latest, q, genre]);
-  const fArtists = useMemo(() => artists.filter((a) => a.handle.toLowerCase().includes(q)), [artists, q]);
+
+  const hotArr = hot ?? [];
+  const latestArr = latest ?? [];
+  // Featured/Hot show hot-flagged tracks when there are any; otherwise they fall
+  // back to the latest real tracks so the sections always show REAL NFTs (never
+  // demo data, never empty when the marketplace has items).
+  const showcase = hotArr.length ? hotArr : latestArr;
+
+  // loading flags drive the gray skeleton templates
+  const showcaseLoading = hot === null && latest === null;
+  const latestLoading = latest === null;
+  const artistsLoading = artists === null;
+  const collectionsLoading = collections === null;
+
+  const fShow = useMemo(() => showcase.filter(matches), [showcase, q, genre]);
+  const fLatest = useMemo(() => latestArr.filter(matches), [latestArr, q, genre]);
+  const fArtists = useMemo(() => (artists ?? []).filter((a) => a.handle.toLowerCase().includes(q)), [artists, q]);
   const genres = useMemo(
-    () => Array.from(new Set([...hot, ...latest].map((t) => t.genre))).sort(),
-    [hot, latest],
+    () => Array.from(new Set([...hotArr, ...latestArr].map((t) => t.genre))).sort(),
+    [hotArr, latestArr],
   );
 
-  // featured carousel = hot tracks; trending = server-ranked by window volume,
-  // falling back to a client-side likes ranking while the API loads / demo mode
-  const featured = fHot.slice(0, 8);
+  const featured = fShow.slice(0, 8);
+  const trendingLoading = trendRows === null && showcaseLoading;
   const trending: (Track & { windowVolumeWei?: string; windowSales?: number })[] = useMemo(() => {
     if (trendRows) return trendRows.filter(matches);
     const seen = new Set<string>();
-    return [...hot, ...latest]
+    return [...hotArr, ...latestArr]
       .filter((t) => (seen.has(t.id) ? false : (seen.add(t.id), true)))
       .filter(matches)
       .sort((a, b) => b.likes - a.likes || b.minted - a.minted)
       .slice(0, 10);
-  }, [trendRows, hot, latest, q, genre]);
+  }, [trendRows, hotArr, latestArr, q, genre]);
 
   function onBought() {
-    api.tracks("?hot=true").then((d) => d.length && setHot(d)).catch(() => {});
+    api.tracks("?hot=true").then(setHot).catch(() => {});
     api.trending(trendWindow).then(setTrendRows).catch(() => {});
   }
 
@@ -93,7 +98,9 @@ export default function Home() {
       {/* ---- featured: manual carousel, hover reveals details ---- */}
       <section className="me-block" id="hot">
         <div className="feat-row">
-          {featured.length === 0 ? (
+          {showcaseLoading ? (
+            Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="skl-feat" />)
+          ) : featured.length === 0 ? (
             <div className="muted-note">No tracks match your search/filter.</div>
           ) : featured.map((t) => (
             <Link key={t.id} href={`/track/${t.id}`} className="feat-card">
@@ -129,14 +136,16 @@ export default function Home() {
       </div>
 
       {/* ---- collections (OpenSea-style) ---- */}
-      {collections.length > 0 && (
+      {(collectionsLoading || (collections && collections.length > 0)) && (
         <section className="me-block" id="collections">
           <div className="sec-head">
             <div className="sec-title">COLLECTIONS</div>
             <Link className="sec-more" href="/collections/new">+ create collection</Link>
           </div>
           <div className="coll-grid">
-            {collections.map((c) => {
+            {collectionsLoading ? (
+              Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="skl-coll" />)
+            ) : (collections ?? []).map((c) => {
               const cells = [...c.covers];
               while (cells.length < 4) cells.push({ coverSeed: c.owner.avatarSeed + cells.length * 7, coverUrl: null });
               return (
@@ -189,7 +198,9 @@ export default function Home() {
             <span className="tt-num tt-vol">VOL ({trendWindow.toUpperCase()})</span>
             <span className="tt-num tt-left">LEFT</span><span className="tt-num tt-likes">LIKES</span><span />
           </div>
-          {trending.length === 0 ? (
+          {trendingLoading ? (
+            Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="skl-row" />)
+          ) : trending.length === 0 ? (
             <div className="muted-note">No tracks match your search/filter.</div>
           ) : trending.map((t, i) => (
             <Link key={t.id} href={`/track/${t.id}`} className="trend-tr">
@@ -231,7 +242,9 @@ export default function Home() {
           <div className="sec-title">SUGGESTED</div>
           <Link className="sec-more" href="/mint">Mint yours →</Link>
         </div>
-        {fLatest.length === 0 ? <div className="muted-note">No tracks match your search/filter.</div> : (
+        {latestLoading ? (
+          <div className="h-row">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="skl-drop" />)}</div>
+        ) : fLatest.length === 0 ? <div className="muted-note">No tracks match your search/filter.</div> : (
           <div className="h-row">
             {fLatest.map((t) => <DropCard key={t.id} t={t} />)}
           </div>
@@ -244,22 +257,24 @@ export default function Home() {
           <div className="sec-title">HOT TRACKS</div>
           <span className="sec-more">hover to pause</span>
         </div>
-        {fHot.length === 0 ? (
+        {showcaseLoading ? (
+          <div className="h-row">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="skl-drop" />)}</div>
+        ) : fShow.length === 0 ? (
           <div className="muted-note">No hot tracks match your search/filter.</div>
-        ) : fHot.length >= 3 ? (
+        ) : fShow.length >= 3 ? (
           <div className="marquee">
-            <div className="marquee-track" style={{ ["--mq-dur" as any]: `${fHot.length * 8}s` }}>
+            <div className="marquee-track" style={{ ["--mq-dur" as any]: `${fShow.length * 8}s` }}>
               <div className="mq-set">
-                {fHot.map((t) => <div className="mq-item" key={t.id}><TrackCard t={t} toast={toast} /></div>)}
+                {fShow.map((t) => <div className="mq-item" key={t.id}><TrackCard t={t} toast={toast} /></div>)}
               </div>
               <div className="mq-set" aria-hidden>
-                {fHot.map((t) => <div className="mq-item" key={`${t.id}-b`}><TrackCard t={t} toast={toast} /></div>)}
+                {fShow.map((t) => <div className="mq-item" key={`${t.id}-b`}><TrackCard t={t} toast={toast} /></div>)}
               </div>
             </div>
           </div>
         ) : (
           <div className="h-row">
-            {fHot.map((t) => <TrackCard key={t.id} t={t} toast={toast} />)}
+            {fShow.map((t) => <TrackCard key={t.id} t={t} toast={toast} />)}
           </div>
         )}
       </section>
@@ -270,9 +285,24 @@ export default function Home() {
           <div className="sec-title">POPULAR ARTISTS</div>
         </div>
         <div className="h-row h-row-artists">
-          {fArtists.map((a) => <ArtistCard key={a.id} a={a} />)}
+          {artistsLoading
+            ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="skl-artist" />)
+            : fArtists.map((a) => <ArtistCard key={a.id} a={a} />)}
         </div>
       </section>
+
+      <style jsx>{`
+        .skl { position: relative; overflow: hidden; background: var(--card-line, rgba(255,255,255,.06)); border: 1px solid var(--line-soft, rgba(255,255,255,.05)); border-radius: 14px; }
+        .skl::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.10), transparent); animation: skl-shimmer 1.3s infinite; }
+        :global([data-theme="light"]) .skl::after { background: linear-gradient(90deg, transparent, rgba(0,0,0,.06), transparent); }
+        @keyframes skl-shimmer { 100% { transform: translateX(100%); } }
+        .skl-feat { height: 400px; border-radius: 18px; }
+        .skl-coll { height: 300px; }
+        .skl-row { height: 58px; border-radius: 10px; }
+        .skl-drop { height: 290px; }
+        .skl-artist { height: 210px; border-radius: 16px; }
+        @media (max-width: 700px) { .skl-feat { height: 330px; } }
+      `}</style>
 
       <CookieBanner />
       <BuyModal track={buyTrack} open={!!buyTrack} onClose={() => setBuyTrack(null)} toast={toast} onBought={onBought} />

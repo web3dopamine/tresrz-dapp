@@ -30,6 +30,7 @@ contract TresrzMusic is ERC1155, ERC2981, Ownable, ReentrancyGuard {
 
     event TrackMinted(uint256 indexed trackId, address indexed artist, uint64 maxSupply, uint96 price, string uri);
     event TrackPurchased(uint256 indexed trackId, address indexed buyer, uint64 qty, uint256 paid);
+    event TrackPriceUpdated(uint256 indexed trackId, uint96 oldPrice, uint96 newPrice);
 
     constructor(address _feeRecipient) ERC1155("") Ownable(msg.sender) {
         feeRecipient = _feeRecipient;
@@ -97,6 +98,27 @@ contract TresrzMusic is ERC1155, ERC2981, Ownable, ReentrancyGuard {
             require(r, "refund fail");
         }
         emit TrackPurchased(trackId, msg.sender, qty, total);
+    }
+
+    /// @notice Update a track's primary-sale price. Only the track's artist or
+    ///         the contract owner may call it. Editions already sold are
+    ///         unaffected — this only changes what future buyers pay.
+    function setPrice(uint256 trackId, uint96 newPrice) public {
+        Track storage t = tracks[trackId];
+        require(t.maxSupply > 0, "no track");
+        require(msg.sender == t.artist || msg.sender == owner(), "auth");
+        uint96 old = t.price;
+        t.price = newPrice;
+        emit TrackPriceUpdated(trackId, old, newPrice);
+    }
+
+    /// @notice Re-price many tracks in one transaction (bulk catalogue updates).
+    function batchSetPrice(uint256[] calldata trackIds, uint96[] calldata newPrices) external {
+        uint256 n = trackIds.length;
+        require(n > 0 && n == newPrices.length, "len mismatch");
+        for (uint256 i = 0; i < n; i++) {
+            setPrice(trackIds[i], newPrices[i]);
+        }
     }
 
     function editionsLeft(uint256 trackId) external view returns (uint64) {

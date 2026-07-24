@@ -59,6 +59,7 @@ export type AdminTrack = Track & { _count?: { likes: number; sales: number }; fl
 export type AdminUser = { id: string; address: string; handle: string | null; bio: string | null; flagged: boolean; createdAt: string; _count?: { tracks: number; sales: number } };
 
 export type ActivityEvent = { kind: string; from: string | null; to: string | null; priceWei: string | null; qty: number; txHash: string | null; at: string };
+export type BulkJob = { id: string; mode: "url" | "csv"; status: "running" | "done" | "error"; total: number; done: number; created: number; skipped: number; failed: number; errors: string[] };
 export type TrendingTrack = Track & { windowVolumeWei: string; windowSales: number; isNew?: boolean };
 export type TrendWindow = "1h" | "1d" | "7d" | "all";
 
@@ -90,6 +91,27 @@ export const api = {
   activity: (trackId: string): Promise<ActivityEvent[]> => req(`/api/activity/${trackId}`),
   recordActivity: (b: { trackId: string; kind: "purchase" | "transfer" | "sale"; txHash: string }) => req(`/api/activity`, { method: "POST", body: JSON.stringify(b) }),
   createTrack: (b: Record<string, unknown>) => req(`/api/tracks`, { method: "POST", body: JSON.stringify(b) }),
+  updateTrack: (id: string, b: { title?: string; genre?: string; priceEth?: number; coverUrl?: string; rarity?: string; externalUrl?: string }): Promise<Track> =>
+    req(`/api/tracks/${id}`, { method: "PATCH", body: JSON.stringify(b) }),
+  updateCollection: (id: string, b: { name?: string; description?: string; coverUrl?: string }): Promise<{ id: string; name: string; slug: string; description: string | null; coverUrl: string | null }> =>
+    req(`/api/collections/${id}`, { method: "PATCH", body: JSON.stringify(b) }),
+
+  // bulk collection upload (URL of metadata JSON files, or a CSV) + progress polling
+  bulkImportUrl: (b: { collectionId: string; baseUrl: string; start: number; end: number; ext?: string; defaultPriceUsd?: number }): Promise<{ jobId: string; total: number }> =>
+    req(`/api/bulk/url`, { method: "POST", body: JSON.stringify(b) }),
+  bulkImportCsv: (collectionId: string, file: File, defaultPriceUsd?: number): Promise<{ jobId: string; total: number }> => {
+    const form = new FormData();
+    form.append("collectionId", collectionId);
+    if (defaultPriceUsd != null) form.append("defaultPriceUsd", String(defaultPriceUsd));
+    form.append("file", file);
+    return fetch(`${BASE}/api/bulk/csv`, { method: "POST", headers: { ...authHeaders() }, body: form })
+      .then(async (res) => { if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || res.statusText); return res.json(); });
+  },
+  bulkJob: (jobId: string): Promise<BulkJob> => req(`/api/bulk/${jobId}`),
+
+  // bulk re-pricing (on-chain + DB). byRarity sets a price per tier; priceEth sets one flat price.
+  repriceTracks: (b: { collectionId?: string; byRarity?: Record<string, string | number>; priceEth?: number }): Promise<{ updated: number; onChain: number; txs: string[] }> =>
+    req(`/api/tracks/reprice`, { method: "POST", body: JSON.stringify(b) }),
 
   // M3: IPFS pipeline + token-gated streaming
   uploadAudio: (file: File) => upload(`/api/upload/audio`, file),

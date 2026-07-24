@@ -99,6 +99,10 @@ const musicWriteAbi = [
   { type: "function", name: "batchMintTracks", stateMutability: "nonpayable", inputs: [
     { name: "maxSupplies", type: "uint64[]" }, { name: "prices", type: "uint96[]" }, { name: "royaltyBpsList", type: "uint96[]" }, { name: "metadataUris", type: "string[]" }],
     outputs: [{ name: "firstTrackId", type: "uint256" }, { name: "count", type: "uint256" }] },
+  { type: "function", name: "setPrice", stateMutability: "nonpayable", inputs: [
+    { name: "trackId", type: "uint256" }, { name: "newPrice", type: "uint96" }], outputs: [] },
+  { type: "function", name: "batchSetPrice", stateMutability: "nonpayable", inputs: [
+    { name: "trackIds", type: "uint256[]" }, { name: "newPrices", type: "uint96[]" }], outputs: [] },
   { type: "event", name: "TrackMinted", inputs: [
     { name: "trackId", type: "uint256", indexed: true }, { name: "artist", type: "address", indexed: true },
     { name: "maxSupply", type: "uint64", indexed: false }, { name: "price", type: "uint96", indexed: false }, { name: "uri", type: "string", indexed: false }] },
@@ -141,6 +145,55 @@ export async function mintResult(hash) {
  * array of { maxSupply, priceWei, royaltyBps, metadataUri }. Returns the tx hash;
  * resolve the assigned tokenIds with batchMintResult(hash).
  */
+/**
+ * Push a track's primary-sale price on-chain. The contract is the source of
+ * truth for what a buyer actually pays, so any price edit MUST land here — a
+ * DB-only change would leave the UI showing one number while buy() charges
+ * another. Returns { ok, hash } — callers await the receipt if they need it.
+ */
+export async function submitSetPrice(trackId, priceWei) {
+  if (!deliveryConfigured) return { ok: false, reason: "platform mint wallet not configured" };
+  try {
+    const hash = await deliveryWallet.writeContract({
+      address: MUSIC_CONTRACT, abi: musicWriteAbi, functionName: "setPrice",
+      args: [BigInt(trackId), BigInt(priceWei)],
+    });
+    return { ok: true, hash };
+  } catch (e) {
+    return { ok: false, reason: String(e.shortMessage || e.message || e) };
+  }
+}
+
+/** Re-price many tracks in one tx (bulk catalogue updates). */
+export async function submitBatchSetPrice(trackIds, pricesWei) {
+  if (!deliveryConfigured) return { ok: false, reason: "platform mint wallet not configured" };
+  if (!trackIds.length || trackIds.length !== pricesWei.length) return { ok: false, reason: "length mismatch" };
+  try {
+    const hash = await deliveryWallet.writeContract({
+      address: MUSIC_CONTRACT, abi: musicWriteAbi, functionName: "batchSetPrice",
+      args: [trackIds.map((x) => BigInt(x)), pricesWei.map((x) => BigInt(x))],
+    });
+    return { ok: true, hash, count: trackIds.length };
+  } catch (e) {
+    return { ok: false, reason: String(e.shortMessage || e.message || e) };
+  }
+}
+
+/** Read a track's current on-chain price (wei) — used to verify UI/chain parity. */
+export async function onChainPrice(trackId) {
+  if (!publicClient) return null;
+  try {
+    const t = await publicClient.readContract({
+      address: MUSIC_CONTRACT,
+      abi: [{ type: "function", name: "tracks", stateMutability: "view", inputs: [{ name: "", type: "uint256" }],
+        outputs: [{ name: "artist", type: "address" }, { name: "price", type: "uint96" }, { name: "maxSupply", type: "uint64" },
+          { name: "minted", type: "uint64" }, { name: "uri", type: "string" }, { name: "active", type: "bool" }] }],
+      functionName: "tracks", args: [BigInt(trackId)],
+    });
+    return t[1].toString();
+  } catch { return null; }
+}
+
 export async function submitBatchMint(items) {
   if (!deliveryConfigured) return { ok: false, reason: "platform mint wallet not configured" };
   try {

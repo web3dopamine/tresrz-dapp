@@ -16,6 +16,7 @@ const BATCH_SIZE = Number(process.argv[4] || 100);
 const MODE = (process.argv[5] || "batch").toLowerCase(); // "batch" | "single"
 const ROYALTY_BPS = Number(process.env.IMPORT_ROYALTY_BPS || 500);
 const GAS_BUFFER_ETH = 0.002;
+const MAX_GAS_GWEI = Number(process.env.MAX_GAS_GWEI || 6); // wait out spikes above this
 
 const toIpfsUri = (u) => { const m = /\/ipfs\/(.+)$/.exec(u || ""); return m ? `ipfs://${m[1]}` : u; };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -49,7 +50,12 @@ async function main() {
     const chunk = pending.slice(i, i + step);
     // Re-read LIVE balance + gas price each batch so a mid-run gas spike can't
     // silently overspend (this was the earlier stall cause).
-    const gasPrice = await publicClient.getGasPrice();
+    let gasPrice = await publicClient.getGasPrice();
+    // ride out gas spikes: wait (up to ~3 min) for gas to drop below MAX_GAS_GWEI
+    for (let w = 0; Number(gasPrice) / 1e9 > MAX_GAS_GWEI && w < 9; w++) {
+      console.log(`gas ${(Number(gasPrice) / 1e9).toFixed(1)} gwei > ${MAX_GAS_GWEI} — waiting for it to drop…`);
+      await sleep(20000); gasPrice = await publicClient.getGasPrice();
+    }
     const balance = await publicClient.getBalance({ address: deliveryAddress });
     const cost = PER_ITEM_GAS * gasPrice * BigInt(chunk.length);
     if (balance < cost + bufferWei) {

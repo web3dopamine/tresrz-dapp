@@ -8,6 +8,7 @@ import Header from "@/components/Header";
 import WaveformPlayer from "@/components/WaveformPlayer";
 import BuyModal from "@/components/BuyModal";
 import ClaimModal from "@/components/ClaimModal";
+import EditTrackModal from "@/components/EditTrackModal";
 import { CoverArt, avatarUrl } from "@/lib/art";
 import { api, type Track, type SaleHistory, type ActivityEvent } from "@/lib/api";
 import { musicAbi, MUSIC_CONTRACT } from "@/lib/abi";
@@ -68,7 +69,7 @@ function Sparkline({ points }: { points: number[] }) {
 
 export default function TrackPage() {
   const { id } = useParams<{ id: string }>();
-  const { token } = useAuth();
+  const { token, me } = useAuth();
   const { address } = useAccount();
 
   const { buy: buyListing, busy: buyingListing } = useBuyListing();
@@ -103,6 +104,7 @@ export default function TrackPage() {
   // USD pricing + buy modal (card / crypto chooser)
   const rate = useUsdRate();
   const [buyOpen, setBuyOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   // Stripe success redirect -> claim/status modal driven by the session id
   const [claimSession, setClaimSession] = useState<string | null>(null);
 
@@ -381,6 +383,9 @@ export default function TrackPage() {
                   <span>by <b>{track.artist.handle}</b></span>
                 </Link>
                 {ownedQty > 0 && <span className="os-owned">YOU OWN {ownedQty}</span>}
+                {me && track.artist.id === me.id && (
+                  <button className="os-edit" onClick={() => setEditOpen(true)}>✎ EDIT DETAILS</button>
+                )}
               </div>
               <div className="os-chips">
                 <span>ERC-1155</span>
@@ -401,7 +406,7 @@ export default function TrackPage() {
               <div className="os-buybox">
                 {minting && <div className="os-minting">⏳ Finalizing on-chain — this track becomes buyable in a few seconds…</div>}
                 <span className="os-buy-label">BUY FOR</span>
-                <div className="os-price">{usd(track.priceWei, rate) ?? "…"}</div>
+                <div className="os-price">{usd(track.priceWei, rate) ?? "…"} <small className="os-price-eth">({priceEth.toLocaleString(undefined, { maximumFractionDigits: 4 })} ETH)</small></div>
                 <div className="os-buy-actions">
                   <button className="buy os-buynow" disabled={track.left === 0 || minting} onClick={() => setBuyOpen(true)}>
                     {minting ? "FINALIZING…" : track.left === 0 ? "SOLD OUT" : "BUY NOW"}
@@ -659,6 +664,15 @@ export default function TrackPage() {
           onClaimed={() => { refreshChain(); }}
         />
       )}
+      {track && (
+        <EditTrackModal
+          track={track}
+          open={editOpen}
+          onClose={() => setEditOpen(false)}
+          onSaved={(t) => setTrack(t)}
+          toast={toast}
+        />
+      )}
       <div className={`toast${msg ? " show" : ""}`}>{msg}</div>
 
       <style jsx>{`
@@ -668,6 +682,8 @@ export default function TrackPage() {
         .os-info { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
         .os-byline { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
         .os-owned { font-family: var(--mono, monospace); font-size: 10px; font-weight: 700; letter-spacing: 1px; color: var(--crimson-soft, #ffa052); border: 1px solid var(--card-line); border-radius: 14px; padding: 4px 10px; }
+        .os-edit { font-family: var(--mono, monospace); font-size: 10px; font-weight: 700; letter-spacing: 1px; color: var(--ink); background: transparent; border: 1px solid var(--crimson, #f58426); border-radius: 14px; padding: 4px 12px; cursor: pointer; transition: .15s; }
+        .os-edit:hover { background: var(--crimson, #f58426); color: #fff; }
         .os-chips { display: flex; flex-wrap: wrap; gap: 8px; }
         .os-chips span { font-family: var(--mono, monospace); font-size: 10px; font-weight: 700; letter-spacing: 1px; color: var(--muted, #bec0c2); background: var(--panel-bg); border: 1px solid var(--card-line); border-radius: 4px; padding: 5px 9px; }
         .os-statbar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; background: var(--card-grad); border: 1px solid var(--card-line); border-radius: 12px; padding: 14px 4px; }

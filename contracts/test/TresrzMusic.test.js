@@ -137,3 +137,47 @@ describe("TresrzMusic", function () {
     });
   });
 });
+
+describe("TresrzMusic — setPrice / batchSetPrice", function () {
+  const ETH2 = (n) => ethers.parseEther(String(n));
+  let music, owner, feeRecipient, artist, buyer, other;
+
+  beforeEach(async function () {
+    [owner, feeRecipient, artist, buyer, other] = await ethers.getSigners();
+    const Music = await ethers.getContractFactory("TresrzMusic");
+    music = await Music.deploy(feeRecipient.address);
+    await music.waitForDeployment();
+    await music.connect(artist).mintTrack(10, ETH2("1"), 500, "ipfs://a");
+    await music.connect(artist).mintTrack(10, ETH2("2"), 500, "ipfs://b");
+  });
+
+  it("artist can re-price; buy() then charges the NEW price", async function () {
+    await expect(music.connect(artist).setPrice(1, ETH2("0.25")))
+      .to.emit(music, "TrackPriceUpdated").withArgs(1n, ETH2("1"), ETH2("0.25"));
+    expect((await music.tracks(1)).price).to.equal(ETH2("0.25"));
+    // paying the new price succeeds
+    await expect(music.connect(buyer).buy(1, 1, { value: ETH2("0.25") })).to.not.be.reverted;
+  });
+
+  it("owner can re-price too", async function () {
+    await music.connect(owner).setPrice(1, ETH2("5"));
+    expect((await music.tracks(1)).price).to.equal(ETH2("5"));
+  });
+
+  it("rejects a stranger and an unknown track", async function () {
+    await expect(music.connect(other).setPrice(1, ETH2("0.1"))).to.be.revertedWith("auth");
+    await expect(music.connect(owner).setPrice(999, ETH2("1"))).to.be.revertedWith("no track");
+  });
+
+  it("underpaying after a price RAISE reverts", async function () {
+    await music.connect(artist).setPrice(1, ETH2("3"));
+    await expect(music.connect(buyer).buy(1, 1, { value: ETH2("1") })).to.be.revertedWith("underpaid");
+  });
+
+  it("batchSetPrice updates many at once and enforces length match", async function () {
+    await music.connect(artist).batchSetPrice([1, 2], [ETH2("0.01"), ETH2("0.25")]);
+    expect((await music.tracks(1)).price).to.equal(ETH2("0.01"));
+    expect((await music.tracks(2)).price).to.equal(ETH2("0.25"));
+    await expect(music.connect(artist).batchSetPrice([1, 2], [ETH2("1")])).to.be.revertedWith("len mismatch");
+  });
+});

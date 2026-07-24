@@ -13,9 +13,11 @@ import adminRoutes from "./routes/admin.js";
 import rateRoutes from "./routes/rate.js";
 import fiatRoutes, { fiatWebhook, startFiatReconciler } from "./routes/fiat.js";
 import mintRoutes, { startMintReconciler } from "./routes/mint.js";
+import { startChainMinter } from "./chainMinter.js";
 import mediaRoutes from "./routes/media.js";
 import collectionRoutes from "./routes/collections.js";
 import activityRoutes from "./routes/activity.js";
+import bulkRoutes from "./routes/bulk.js";
 import { UPLOAD_DIR } from "./ipfs.js";
 
 // Fail fast: a missing/placeholder JWT_SECRET means every token is forgeable.
@@ -86,6 +88,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/rate", rateRoutes);
 app.use("/api/collections", collectionRoutes);
 app.use("/api/activity", activityRoutes);
+app.use("/api/bulk", strictLimiter, bulkRoutes);
 app.use("/api/fiat", strictLimiter, fiatRoutes);
 app.use("/api/mint", mintLimiter, mintRoutes);
 
@@ -106,4 +109,5 @@ app.listen(port, () => {
   console.log(`TRESRZ API on :${port}`);
   startFiatReconciler(); // heals card orders stuck by crashes/timeouts
   startMintReconciler(); // finalizes background mints once they confirm on-chain
+  startChainMinter();    // slowly mints bulk-imported catalog items on-chain
 });
