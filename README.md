@@ -21,8 +21,8 @@ mint+sale updates. Prisma + Postgres gives integrity and clean joins for the
 ## Quick start
 ```bash
 ./setup.sh                       # postgres + install + db push + seed
-cd backend  && npm run dev       # http://localhost:4000
-cd frontend && npm run dev       # http://localhost:3000
+cd backend  && npm run dev       # http://localhost:31338
+cd frontend && npm run dev       # http://localhost:31337
 ```
 The frontend renders demo data immediately; once the API + seed are up it pulls live data.
 
@@ -53,7 +53,38 @@ npm run deploy:liberty           # or deploy:local / network sepolia
 
 ## Layout
 ```
-contracts/  Hardhat project (TresrzMusic.sol, deploy.js)
+contracts/  Hardhat project (TresrzMusic.sol, deploy.js, test/)
 backend/    Express + Prisma API (routes, SIWE middleware, seed)
 frontend/   Next.js app (RainbowKit providers, components, generative art)
 ```
+
+## Ports
+Frontend **31337**, backend API **31338** (see `*/.env.example`). The frontend `dev`/`start`
+scripts pin `-p 31337`.
+
+## Local run without Docker
+`docker-compose.yml` describes the Postgres the app expects
+(`postgresql://tresrz:tresrz@localhost:5432/tresrz`). If you can't run Docker, point
+`DATABASE_URL` at any Postgres exposing that database. Then:
+```bash
+cd contracts && npm i && npx hardhat node &        # local chain (chainId 31337)
+npm run deploy:local                               # prints the TresrzMusic address
+# put that address in backend/.env (MUSIC_CONTRACT) and frontend/.env.local (NEXT_PUBLIC_MUSIC_CONTRACT)
+cd ../backend  && npm i && npx prisma db push && npm run seed && npm run dev   # :31338
+cd ../frontend && npm i && npm run dev                                        # :31337
+```
+The seed **mints the demo tracks on-chain** (from hardhat artist accounts) when
+`MUSIC_CONTRACT`/`RPC_URL` are set, so every seeded track is real and buyable; without
+them it seeds off-chain (`chainTokenId = null`).
+
+## Production-hardening notes
+- **`JWT_SECRET` is required at boot** — the API exits if it's missing, the placeholder, or <32 chars.
+- **SIWE nonces are stored in Postgres** (`SiweNonce`, 10-min TTL, single-use) so pending
+  logins survive an API restart.
+- **`POST /api/sales` is verified on-chain** — the server reads the `TrackPurchased` event
+  for the supplied `txHash` and only records the sale if the tokenId, buyer (= the
+  authenticated wallet) and qty match. Forged/replayed tx hashes are rejected.
+- **Rate limiting** (`express-rate-limit`): 600 req/15 min across `/api`, 60/15 min on
+  `/api/auth` and `/api/sales`.
+- **Contract tests**: `cd contracts && npm test` (mint/royalty bounds, fee split, refund,
+  sold-out/inactive reverts, reentrancy).

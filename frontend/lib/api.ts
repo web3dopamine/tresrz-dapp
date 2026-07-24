@@ -1,4 +1,9 @@
-const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+// Default to same-origin ("") so calls go to /api/* and are proxied to the backend by
+// next.config.js — works on localhost AND through the Cloudflare tunnel. Only use an
+// absolute URL when NEXT_PUBLIC_API_URL is explicitly set to a non-empty value.
+// (Note: `|| "http://localhost:31338"` was wrong — an empty env value is falsy and
+// would fall back to localhost, which is unreachable from a browser over the tunnel.)
+const BASE = (process.env.NEXT_PUBLIC_API_URL ?? "").trim();
 
 function authHeaders(): Record<string, string> {
   if (typeof window === "undefined") return {};
@@ -15,23 +20,149 @@ async function req(path: string, init: RequestInit = {}) {
   return res.json();
 }
 
+// Multipart upload (no JSON Content-Type — the browser sets the multipart boundary).
+async function upload(path: string, file: File): Promise<UploadResult> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${BASE}${path}`, { method: "POST", headers: { ...authHeaders() }, body: form });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || res.statusText);
+  return res.json();
+}
+
 export type Track = {
   id: string; chainTokenId: number | null; title: string; genre: string; coverSeed: number;
-  priceWei: string; maxSupply: number; minted: number; left: number; hot: boolean;
+  audioUrl?: string | null; coverUrl?: string | null; metadataUri?: string | null; mime?: string | null;
+  hasFullAudio?: boolean;
+  priceWei: string; maxSupply: number; minted: number; left: number; hot: boolean; flagged?: boolean;
+  custodial?: boolean; mintStatus?: string; rarity?: string | null;
+  attributes?: Array<{ trait_type: string; value: any; count?: number | null; pct?: number | null; frequency?: string }> | null;
+  externalUrl?: string | null;
   artist: { id: string; handle: string; address: string; avatarSeed: number };
   likes: number; liked: boolean;
+  txHash?: string | null; createdAt?: string;
 };
 export type Artist = { id: string; handle: string; address: string; avatarSeed: number; nftCount: number; likes: number };
+export type Collection = { id: string; name: string; slug: string; description?: string | null; coverUrl?: string | null; owner: { id: string; handle: string; avatarSeed: number; address: string }; itemCount: number; floorWei: string | null; covers: { coverSeed: number; coverUrl: string | null }[] };
+export type CollectionDetail = Collection & { rarities: { rarity: string; count: number }[] };
+export type MyCollection = { id: string; name: string; slug: string; itemCount: number };
+export type ArtistDetail = { id: string; handle: string; address: string; avatarSeed: number; bio: string | null; nftCount: number; totalLikes: number; tracks: Track[]; collectionName?: string | null; floorWei?: string | null };
+export type SaleHistory = {
+  kind: string; qty: number; priceWei: string; unitWei: string; txHash: string;
+  buyer: string | null; seller: string | null; at: string;
+};
+export type UploadResult = { cid: string | null; uri: string | null; url: string | null; pinned: boolean; mime?: string };
+export type AdminStats = {
+  users: number; tracks: number; sales: number; flaggedTracks: number; flaggedUsers: number; featured: number;
+  saleCount: number; contracts: { music: string | null; market: string | null; chainConfigured: boolean };
+};
+export type AdminTrack = Track & { _count?: { likes: number; sales: number }; flagged: boolean };
+export type AdminUser = { id: string; address: string; handle: string | null; bio: string | null; flagged: boolean; createdAt: string; _count?: { tracks: number; sales: number } };
+
+export type ActivityEvent = { kind: string; from: string | null; to: string | null; priceWei: string | null; qty: number; txHash: string | null; at: string };
+export type BulkJob = { id: string; mode: "url" | "csv"; status: "running" | "done" | "error"; total: number; done: number; created: number; skipped: number; failed: number; errors: string[] };
+export type TrendingTrack = Track & { windowVolumeWei: string; windowSales: number; isNew?: boolean };
+export type TrendWindow = "1h" | "1d" | "7d" | "all";
 
 export const api = {
   tracks: (q = ""): Promise<Track[]> => req(`/api/tracks${q}`),
+  trending: (window: TrendWindow = "1d"): Promise<TrendingTrack[]> => req(`/api/tracks/trending?window=${window}`),
   track: (id: string): Promise<Track> => req(`/api/tracks/${id}`),
+  myTracks: (): Promise<Track[]> => req(`/api/tracks/mine`),
   artists: (): Promise<Artist[]> => req(`/api/artists`),
+  collections: (limit = 12): Promise<Collection[]> => req(`/api/collections?limit=${limit}`),
+  collection: (key: string): Promise<CollectionDetail> => req(`/api/collections/${key}`),
+  myCollections: (): Promise<MyCollection[]> => req(`/api/collections/mine`),
+  createCollection: (b: { name: string; description?: string }): Promise<{ id: string; name: string; slug: string }> => req(`/api/collections`, { method: "POST", body: JSON.stringify(b) }),
+  collectionRarities: (id: string): Promise<{ rarity: string; count: number }[]> => req(`/api/tracks/rarities?collection=${id}`),
+  artist: (key: string): Promise<ArtistDetail> => req(`/api/artists/${key}`),
+  rarities: (artistId: string): Promise<{ rarity: string; count: number }[]> => req(`/api/tracks/rarities?artist=${artistId}`),
   nonce: (address: string): Promise<{ nonce: string }> => req(`/api/auth/nonce?address=${address}`),
   verify: (message: string, signature: string) => req(`/api/auth/verify`, { method: "POST", body: JSON.stringify({ message, signature }) }),
-  me: () => req(`/api/auth/me`),
+  me: (): Promise<{ user: any; isAdmin: boolean }> => req(`/api/auth/me`),
+  // email + Google accounts (no email verification)
+  signupEmail: (b: { email: string; password: string; handle?: string }): Promise<{ token: string; user: any }> => req(`/api/auth/signup`, { method: "POST", body: JSON.stringify(b) }),
+  loginEmail: (b: { email: string; password: string }): Promise<{ token: string; user: any }> => req(`/api/auth/login`, { method: "POST", body: JSON.stringify(b) }),
+  loginGoogle: (credential: string): Promise<{ token: string; user: any }> => req(`/api/auth/google`, { method: "POST", body: JSON.stringify({ credential }) }),
+  googleStatus: (): Promise<{ enabled: boolean; clientId: string | null }> => req(`/api/auth/google/status`),
   toggleLike: (trackId: string) => req(`/api/likes/${trackId}`, { method: "POST" }),
   recordSale: (b: { trackId: string; qty: number; priceWei: string; txHash: string }) => req(`/api/sales`, { method: "POST", body: JSON.stringify(b) }),
+  recordSecondarySale: (b: { trackId: string; qty: number; txHash: string }) => req(`/api/sales/secondary`, { method: "POST", body: JSON.stringify(b) }),
+  history: (trackId: string): Promise<SaleHistory[]> => req(`/api/sales/history/${trackId}`),
+  activity: (trackId: string): Promise<ActivityEvent[]> => req(`/api/activity/${trackId}`),
+  recordActivity: (b: { trackId: string; kind: "purchase" | "transfer" | "sale"; txHash: string }) => req(`/api/activity`, { method: "POST", body: JSON.stringify(b) }),
   createTrack: (b: Record<string, unknown>) => req(`/api/tracks`, { method: "POST", body: JSON.stringify(b) }),
+  updateTrack: (id: string, b: { title?: string; genre?: string; priceEth?: number; coverUrl?: string; rarity?: string; externalUrl?: string }): Promise<Track> =>
+    req(`/api/tracks/${id}`, { method: "PATCH", body: JSON.stringify(b) }),
+  updateCollection: (id: string, b: { name?: string; description?: string; coverUrl?: string }): Promise<{ id: string; name: string; slug: string; description: string | null; coverUrl: string | null }> =>
+    req(`/api/collections/${id}`, { method: "PATCH", body: JSON.stringify(b) }),
+
+  // bulk collection upload (URL of metadata JSON files, or a CSV) + progress polling
+  bulkImportUrl: (b: { collectionId: string; baseUrl: string; start: number; end: number; ext?: string; defaultPriceUsd?: number }): Promise<{ jobId: string; total: number }> =>
+    req(`/api/bulk/url`, { method: "POST", body: JSON.stringify(b) }),
+  bulkImportCsv: (collectionId: string, file: File, defaultPriceUsd?: number): Promise<{ jobId: string; total: number }> => {
+    const form = new FormData();
+    form.append("collectionId", collectionId);
+    if (defaultPriceUsd != null) form.append("defaultPriceUsd", String(defaultPriceUsd));
+    form.append("file", file);
+    return fetch(`${BASE}/api/bulk/csv`, { method: "POST", headers: { ...authHeaders() }, body: form })
+      .then(async (res) => { if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || res.statusText); return res.json(); });
+  },
+  bulkJob: (jobId: string): Promise<BulkJob> => req(`/api/bulk/${jobId}`),
+
+  // bulk re-pricing (on-chain + DB). byRarity sets a price per tier; priceEth sets one flat price.
+  repriceTracks: (b: { collectionId?: string; byRarity?: Record<string, string | number>; priceEth?: number }): Promise<{ updated: number; onChain: number; txs: string[] }> =>
+    req(`/api/tracks/reprice`, { method: "POST", body: JSON.stringify(b) }),
+
+  // M3: IPFS pipeline + token-gated streaming
+  uploadAudio: (file: File) => upload(`/api/upload/audio`, file),
+  uploadImage: (file: File) => upload(`/api/upload/image`, file),
+  pinMetadata: (b: Record<string, unknown>): Promise<UploadResult & { metadata: any }> =>
+    req(`/api/upload/metadata`, { method: "POST", body: JSON.stringify(b) }),
+  streamPreview: (trackId: string): Promise<{ trackId: string; previewUrl: string | null }> => req(`/api/stream/${trackId}/preview`),
+  streamFull: (trackId: string): Promise<{ trackId: string; fullUrl: string; mime: string | null; viaArtist: boolean }> =>
+    req(`/api/stream/${trackId}/full`),
+
+  // USD pricing + Stripe card checkout
+  rate: (): Promise<{ usdPerEth: number; at: number }> => req(`/api/rate`),
+  fiatStatus: (): Promise<{ enabled: boolean }> => req(`/api/fiat/status`),
+  fiatCheckout: (b: { trackId: string; qty: number; deliveryAddress?: string }): Promise<{ url: string }> =>
+    req(`/api/fiat/checkout`, { method: "POST", body: JSON.stringify(b) }),
+  fiatOrder: (sessionId: string): Promise<{ status: "held" | "delivered" | "processing" | "refunded"; qty?: number; track?: { id: string; title: string; coverSeed: number }; deliveredTo?: string | null; deliverTx?: string | null }> =>
+    req(`/api/fiat/order?session_id=${encodeURIComponent(sessionId)}`),
+  fiatClaim: (b: { sessionId: string; address: string }): Promise<{ ok: boolean; deliverTx: string; deliveredTo: string }> =>
+    req(`/api/fiat/claim`, { method: "POST", body: JSON.stringify(b) }),
+
+  // custodial (wallet-less) minting + creator dashboard
+  custodialStatus: (): Promise<{ enabled: boolean }> => req(`/api/mint/status`),
+  custodialMint: (form: FormData, onProgress?: (pct: number) => void): Promise<{ trackId: string; txHash?: string; status: string }> => {
+    // XHR (not fetch) so we can report real upload progress — the audio upload is
+    // the only real wait. Auth-gated: send the bearer token; don't set
+    // Content-Type so the browser keeps the multipart boundary.
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${BASE}/api/mint/custodial`);
+      const t = typeof window !== "undefined" ? localStorage.getItem("tresrz_token") : null;
+      if (t) xhr.setRequestHeader("Authorization", `Bearer ${t}`);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () => {
+        let body: any = {};
+        try { body = JSON.parse(xhr.responseText); } catch {}
+        if (xhr.status >= 200 && xhr.status < 300) resolve(body);
+        else reject(new Error(body?.error || xhr.statusText || "Publish failed"));
+      };
+      xhr.onerror = () => reject(new Error("Network error during upload"));
+      xhr.send(form);
+    });
+  },
+
+  // M4: admin
+  adminStats: (): Promise<AdminStats> => req(`/api/admin/stats`),
+  adminTracks: (): Promise<AdminTrack[]> => req(`/api/admin/tracks`),
+  adminUsers: (): Promise<AdminUser[]> => req(`/api/admin/users`),
+  adminFeature: (id: string, featured: boolean) => req(`/api/admin/tracks/${id}/feature`, { method: "POST", body: JSON.stringify({ featured }) }),
+  adminFlagTrack: (id: string, flagged: boolean) => req(`/api/admin/tracks/${id}/flag`, { method: "POST", body: JSON.stringify({ flagged }) }),
+  adminFlagUser: (id: string, flagged: boolean) => req(`/api/admin/users/${id}/flag`, { method: "POST", body: JSON.stringify({ flagged }) }),
 };
 export { BASE };

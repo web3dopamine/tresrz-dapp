@@ -1,13 +1,14 @@
 "use client";
+import Link from "next/link";
 import { CoverArt, avatarUrl } from "@/lib/art";
 import type { Track } from "@/lib/api";
 
-export default function DropCard({ t, onClick }: { t: Track; onClick: () => void }) {
+export default function DropCard({ t }: { t: Track }) {
   return (
-    <div className="drop" onClick={onClick}>
-      <CoverArt seed={t.coverSeed} />
+    <Link href={`/track/${t.id}`} className="drop" style={{ display: "block", textDecoration: "none" }}>
+      <CoverArt seed={t.coverSeed} url={t.coverUrl} video={t.mime?.startsWith("video") ? `/api/media/${t.id}/preview` : undefined} />
       <div className="tag"><img src={avatarUrl(t.artist.avatarSeed)} alt="" /><b>{t.artist.handle}</b></div>
       <div className="foot"><h4>{t.title}</h4><span>{t.genre}</span></div>
-    </div>
+    </Link>
   );
 }

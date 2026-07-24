@@ -1,16 +1,76 @@
-generator client { provider = "prisma-client-js" }
-datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
 
 model User {
   id        String   @id @default(cuid())
-  address   String   @unique            // checksummed wallet address
+  address   String?  @unique            // wallet address (SIWE users); null for email/Google accounts
+  email     String?  @unique            // email/Google account identity
+  passwordHash String?                   // email+password accounts (scrypt salt:hash)
+  googleId  String?  @unique            // Google (Gmail) OAuth accounts (sub claim)
   handle    String?  @unique
   avatarSeed Int     @default(0)
   bio       String?
+  flagged   Boolean  @default(false)    // admin moderation flag
+  custodial Boolean  @default(false)    // wallet-less creator: platform mints & holds earnings
+  balanceWei String  @default("0")      // accrued custodial earnings, withdrawable (wei)
+  manageTokenHash String?               // sha256 of the bearer token that controls this custodial account
   createdAt DateTime @default(now())
   tracks    Track[]  @relation("ArtistTracks")
   likes     Like[]
   sales     Sale[]   @relation("BuyerSales")
+  soldSales Sale[]   @relation("SellerSales")
+  payouts   Payout[]
+  collections Collection[] @relation("OwnedCollections")
+}
+
+// A named collection a creator groups their tracks under (OpenSea-style). One
+// creator can own many collections.
+model Collection {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  coverUrl    String?
+  owner       User     @relation("OwnedCollections", fields: [ownerId], references: [id])
+  ownerId     String
+  flagged     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  tracks      Track[]
+  @@index([ownerId])
+}
+
+// Item activity log (OpenSea-style): one row per event on a track — mint,
+// purchase, transfer, sale, list — for the NFT page's Activity feed.
+model Activity {
+  id         String   @id @default(cuid())
+  track      Track    @relation(fields: [trackId], references: [id])
+  trackId    String
+  kind       String   // mint | purchase | transfer | sale | list
+  fromAddr   String?
+  toAddr     String?
+  priceWei   String?
+  qty        Int      @default(1)
+  txHash     String?
+  at         DateTime @default(now())
+  @@index([trackId])
+}
+
+// Custodial creator withdrawal of accrued earnings to a wallet address.
+model Payout {
+  id        String   @id @default(cuid())
+  creator   User     @relation(fields: [creatorId], references: [id])
+  creatorId String
+  amountWei String
+  toAddress String
+  txHash    String?
+  status    String   @default("pending") // pending | sent | failed
+  createdAt DateTime @default(now())
 }
 
 model Track {
@@ -19,17 +79,93 @@ model Track {
   title        String
   genre        String
   coverSeed    Int      @default(0)      // drives generative cover art
-  audioUrl     String?
+  audioUrl     String?                   // public preview URL (gateway/local)
+  audioCid     String?                   // full-track IPFS CID (gated to holders)
+  coverUrl     String?                   // cover image URL (IPFS/local), optional
+  metadataUri  String?                   // ipfs:// or URL of ERC-721 metadata JSON
+  mime         String?                   // audio mime type (e.g. audio/mpeg)
+  externalUrl  String?                   // source/animation gateway URL for imported collections
+  attributes   Json?                     // full trait list from imported metadata (OpenSea attributes[])
+  rarity       String?                   // rarity tier (COMMON/RARE/ULTRA RARE...) for filtering
+  collection   Collection? @relation(fields: [collectionId], references: [id])
+  collectionId String?
+  @@index([rarity])
+  @@index([collectionId])
   priceWei     String   @default("0")    // primary price per edition (wei, string for bigint)
   maxSupply    Int
   minted       Int      @default(0)
   txHash       String?
   artist       User     @relation("ArtistTracks", fields: [artistId], references: [id])
   artistId     String
-  hot          Boolean  @default(false)
+  hot          Boolean  @default(false)  // "featured" flag (admin-controlled)
+  flagged      Boolean  @default(false)  // admin moderation flag (hidden from listings)
+  custodial    Boolean  @default(false)  // minted by platform on behalf of a wallet-less creator
+  mintTx       String?                   // on-chain mint tx (set while awaiting confirmation)
+  mintStatus   String   @default("active") // active | publishing (bg pin+submit) | minting (bg-confirming) | failed
   createdAt    DateTime @default(now())
   likes        Like[]
   sales        Sale[]
+  fiatOrders   FiatOrder[]
+  activities   Activity[]
+  media        TrackMedia?
+}
+
+// Raw uploaded bytes, kept in a SEPARATE table so the (many) Track list queries
+// never drag multi-MB blobs into memory. Served immediately by /api/media/:id/*
+// so a freshly-published track is playable on the frontend right away, before
+// the background IPFS pin + on-chain mint finish.
+model TrackMedia {
+  id        String   @id @default(cuid())
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  trackId   String   @unique
+  audioData Bytes?
+  audioMime String?
+  imageData Bytes?
+  imageMime String?
+  createdAt DateTime @default(now())
+}
+
+// A card order fulfilled by the platform delivery wallet. The row is created
+// (status=processing) as the FIRST action in the webhook — its unique
+// stripeSessionId is the atomic idempotency lock, so concurrent Stripe
+// retries can never double-buy. State machine:
+//   processing -> (buy submitted, buyTx set) -> held      [guest: awaits claim]
+//                                            -> delivered [direct: auto-sent]
+//   processing -> refunded                                [oversell/revert]
+//   held -> delivering (deliveringAt set) -> delivered    [claim]
+// `delivering` is self-healing: a stale one (crash mid-transfer) is retried
+// by the reconciler after re-checking on-chain state, so no order is ever
+// permanently trapped.
+model FiatOrder {
+  id              String   @id @default(cuid())
+  stripeSessionId String   @unique                    // atomic lock + claim credential
+  paymentIntent   String?                             // for refunds
+  track           Track    @relation(fields: [trackId], references: [id])
+  trackId         String
+  chainTokenId    Int
+  qty             Int
+  unitPriceWei    String                              // per-edition primary price
+  paidWei         String   @default("0")              // ETH spent by delivery wallet
+  buyer           String?                             // known wallet (direct delivery) or null (guest claim)
+  buyTx           String?                             // on-chain primary buy tx (set right after submit)
+  status          String   @default("processing")     // processing | held | delivering | delivered | refunded | failed
+  mintedCounted   Boolean  @default(false)            // guards the one-time Track.minted increment
+  deliveredTo     String?                             // final claim wallet
+  deliverTx       String?                             // claim/delivery transfer tx
+  deliveringAt    DateTime?                            // set when a transfer is in flight (staleness clock)
+  attempts        Int      @default(0)
+  lastError       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deliveredAt     DateTime?
+}
+
+// SIWE login nonces. DB-backed so issued nonces survive an API restart (the old
+// in-memory Map dropped every pending login whenever the process bounced).
+model SiweNonce {
+  address   String   @id          // lower-cased wallet address
+  nonce     String
+  createdAt DateTime @default(now())
 }
 
 model Like {
@@ -47,8 +183,12 @@ model Sale {
   trackId  String
   buyer    User     @relation("BuyerSales", fields: [buyerId], references: [id])
   buyerId  String
+  seller   User?    @relation("SellerSales", fields: [sellerId], references: [id])
+  sellerId String?                                  // null for primary sales
+  kind     String   @default("primary")             // primary | secondary_listing | secondary_offer | fiat_primary
   qty      Int
-  priceWei String
+  priceWei String                                    // total paid (wei)
   txHash   String   @unique
+  stripeSessionId String? @unique                    // set for fiat (card) purchases — idempotency key
   createdAt DateTime @default(now())
 }

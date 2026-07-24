@@ -30,6 +30,7 @@ contract TresrzMusic is ERC1155, ERC2981, Ownable, ReentrancyGuard {
 
     event TrackMinted(uint256 indexed trackId, address indexed artist, uint64 maxSupply, uint96 price, string uri);
     event TrackPurchased(uint256 indexed trackId, address indexed buyer, uint64 qty, uint256 paid);
+    event TrackPriceUpdated(uint256 indexed trackId, uint96 oldPrice, uint96 newPrice);
 
     constructor(address _feeRecipient) ERC1155("") Ownable(msg.sender) {
         feeRecipient = _feeRecipient;
@@ -48,6 +49,30 @@ contract TresrzMusic is ERC1155, ERC2981, Ownable, ReentrancyGuard {
         tracks[trackId] = Track(msg.sender, price, maxSupply, 0, metadataUri, true);
         _setTokenRoyalty(trackId, msg.sender, uint96(royaltyBps));
         emit TrackMinted(trackId, msg.sender, maxSupply, price, metadataUri);
+    }
+
+    /// @notice Register many tracks in a single transaction (bulk collection
+    ///         import). One base tx cost instead of N, and ~100x fewer txs.
+    ///         All four arrays must be the same length. Returns the first
+    ///         assigned trackId and the count minted (ids are contiguous).
+    function batchMintTracks(
+        uint64[] calldata maxSupplies,
+        uint96[] calldata prices,
+        uint96[] calldata royaltyBpsList,
+        string[] calldata metadataUris
+    ) external returns (uint256 firstTrackId, uint256 count) {
+        count = metadataUris.length;
+        require(count > 0, "empty");
+        require(maxSupplies.length == count && prices.length == count && royaltyBpsList.length == count, "len mismatch");
+        firstTrackId = nextTrackId;
+        for (uint256 i = 0; i < count; i++) {
+            require(maxSupplies[i] > 0, "supply=0");
+            require(royaltyBpsList[i] <= 1000, "royalty>10%");
+            uint256 trackId = nextTrackId++;
+            tracks[trackId] = Track(msg.sender, prices[i], maxSupplies[i], 0, metadataUris[i], true);
+            _setTokenRoyalty(trackId, msg.sender, royaltyBpsList[i]);
+            emit TrackMinted(trackId, msg.sender, maxSupplies[i], prices[i], metadataUris[i]);
+        }
     }
 
     /// @notice Buy `qty` editions of a track on the primary market.
@@ -73,6 +98,27 @@ contract TresrzMusic is ERC1155, ERC2981, Ownable, ReentrancyGuard {
             require(r, "refund fail");
         }
         emit TrackPurchased(trackId, msg.sender, qty, total);
+    }
+
+    /// @notice Update a track's primary-sale price. Only the track's artist or
+    ///         the contract owner may call it. Editions already sold are
+    ///         unaffected — this only changes what future buyers pay.
+    function setPrice(uint256 trackId, uint96 newPrice) public {
+        Track storage t = tracks[trackId];
+        require(t.maxSupply > 0, "no track");
+        require(msg.sender == t.artist || msg.sender == owner(), "auth");
+        uint96 old = t.price;
+        t.price = newPrice;
+        emit TrackPriceUpdated(trackId, old, newPrice);
+    }
+
+    /// @notice Re-price many tracks in one transaction (bulk catalogue updates).
+    function batchSetPrice(uint256[] calldata trackIds, uint96[] calldata newPrices) external {
+        uint256 n = trackIds.length;
+        require(n > 0 && n == newPrices.length, "len mismatch");
+        for (uint256 i = 0; i < n; i++) {
+            setPrice(trackIds[i], newPrices[i]);
+        }
     }
 
     function editionsLeft(uint256 trackId) external view returns (uint64) {

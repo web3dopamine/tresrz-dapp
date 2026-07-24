@@ -24,3 +24,22 @@ export function optionalAuth(req, _res, next) {
   if (token) { try { req.user = jwt.verify(token, process.env.JWT_SECRET); } catch {} }
   next();
 }
+
+// Admin allowlist from ADMIN_ADDRESSES (comma-separated wallet addresses).
+// Typically the contract owner / platform multisig.
+const ADMIN_ADDRESSES = (process.env.ADMIN_ADDRESSES || "")
+  .split(",")
+  .map((a) => a.trim().toLowerCase())
+  .filter(Boolean);
+
+export function isAdminAddress(address) {
+  return ADMIN_ADDRESSES.includes(String(address || "").toLowerCase());
+}
+
+// Hard admin gate: valid token AND wallet in the admin allowlist.
+export function requireAdmin(req, res, next) {
+  return requireAuth(req, res, () => {
+    if (!isAdminAddress(req.user?.address)) return res.status(403).json({ error: "admin only" });
+    next();
+  });
+}

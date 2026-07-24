@@ -55,3 +55,15 @@ Thumbs.db
 .vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
+
+# TS build info
+*.tsbuildinfo
+
+# M3 IPFS local-fallback storage (runtime artifacts)
+backend/uploads/
+uploads/
+
+# ── TRESRZ runtime/migration artifacts ───────────────────────
+backend/previews/
+backend/tresrz_artifacts.json
+backend/remint-progress.json
